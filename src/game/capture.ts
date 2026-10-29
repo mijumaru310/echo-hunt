@@ -1,54 +1,73 @@
-//捕捉範囲
-const captureRange: number = 5;
+// 捕捉範囲（単位：度）
+const captureRange: number = 15;
 
-//敵が捕捉範囲内にいるかを判定する関数
-export function isInCaptureRange(relAngle: number): boolean {
-    const diff: number = Math.abs(relAngle);
-    return diff <= captureRange;
-}
+// ロックオン完了までの時間
+export const captureTimeMs: number = 700;
 
-// 捕獲に必要な時間：1000ミリ秒＝1秒
-export const captureTimeMs: number = 1000;
-
-// ゲージの減少倍率
-const decayRate: number = 1;
+// 満タンのゲージが0になる時間
+// 指示書の例に合わせ、仮に400ミリ秒とする
+const decayTimeMs: number = 400;
 
 // 敵1体の捕捉状態
 export interface CaptureState {
-    progressMs: number;   // 捕捉ゲージ
-    isCaptured: boolean;  // 捕獲済みか
+    progressMs: number;
+    isCaptured: boolean;
 }
 
-// 捕捉ゲージと捕獲状態を更新する
+// 敵が捕捉範囲内にいるか
+export function isInCaptureRange(relAngle: number): boolean {
+    const diff: number = Math.abs(relAngle);
+
+    return diff <= captureRange;
+}
+
+// 方向と経過時間から、ロックオンの進捗を更新する
 export function updateCapture(
     state: CaptureState,
     relAngle: number,
-    isHolding: boolean,
     dtMs: number
 ): CaptureState {
-    // 捕獲済みなら、その状態を維持
     if (state.isCaptured) {
         return state;
     }
 
-    // 経過時間が負にならないようにする
     const elapsedMs: number = Math.max(0, dtMs);
-
     let progressMs: number = state.progressMs;
 
-    if (isHolding && isInCaptureRange(relAngle)) {
-        // 長押し中で、敵が範囲内なら増加
+    if (isInCaptureRange(relAngle)) {
+        // ボタン操作に関係なく、方向が合えば増える
         progressMs = progressMs + elapsedMs;
     } else {
-        // 指を離したか、敵が範囲外なら減少
+        // 満タンから400ミリ秒で0になる速度で減る
+        const decayRate: number = captureTimeMs / decayTimeMs;
         progressMs = progressMs - elapsedMs * decayRate;
     }
 
-    // ゲージを0〜1000ミリ秒の範囲に収める
     progressMs = Math.max(0, Math.min(captureTimeMs, progressMs));
 
+    // 満タンでも、この段階では捕獲しない
     return {
         progressMs: progressMs,
-        isCaptured: progressMs >= captureTimeMs
+        isCaptured: false
+    };
+}
+
+// 捕獲ボタンを押した瞬間に呼ぶ
+export function tryCapture(
+    state: CaptureState,
+    relAngle: number
+): CaptureState {
+    // 捕獲済み・範囲外・ロックオン未完了なら何もしない
+    if (
+        state.isCaptured ||
+        !isInCaptureRange(relAngle) ||
+        state.progressMs < captureTimeMs
+    ) {
+        return state;
+    }
+
+    return {
+        progressMs: state.progressMs,
+        isCaptured: true
     };
 }
