@@ -1,6 +1,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { SpatialAudio } from "./audio/SpatialAudioEngine";
+import SensorDebugPage from "./debug/SensorDebugPage";
+
+import SensorAudioDebugPage from "./debug/SensorAudioDebugPage";
+
+import OrientationTestPage from "./debug/OrientationTestPage";
 
 function App() {
   const audio = useRef<SpatialAudio | null>(null);
@@ -66,6 +71,9 @@ function App() {
 
       <p>0° 正面 / 90° 右 / ±180° 後方 / -90° 左</p>
       {error && <p role="alert">{error}</p>}
+      <SensorDebugPage />
+      <SensorAudioDebugPage />
+      <OrientationTestPage />;
     </main>
   );
 }
