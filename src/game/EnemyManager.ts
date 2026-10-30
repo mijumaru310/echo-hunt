@@ -3,12 +3,16 @@ import type { Enemy } from "./types.ts";
 export function createEnemy(
     worldYaw: number,
     distance: number,
-    id: string
+    id: string,
 ): Enemy {
     const enemy: Enemy = {
         id: id,
         worldYaw: worldYaw,
-        distance: distance
+        distance: distance,
+        capture: {
+            progressMs: 0,
+            isCaptured: false
+        }
     };
 
     return enemy;
