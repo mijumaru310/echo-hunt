@@ -2,7 +2,7 @@ import type { ChangeEvent, ReactElement } from "react";
 import { useState, useEffect } from "react";
 import type { Enemy } from "../game/types.ts";
 import { createEnemy } from "../game/EnemyManager.ts";
-import { relativeAngle, isInCaptureRange,captureTimeMs, updateCapture} from "../game/capture.ts";
+import { relativeAngle, isInCaptureRange,captureTimeMs, updateCapture, tryCapture } from "../game/capture.ts";
 
 
 // ゲーム画面
@@ -15,6 +15,19 @@ export default function GameScreen(): ReactElement {
     const inRange: boolean = isInCaptureRange(relAngle);
     function changePlayerYaw(event:ChangeEvent<HTMLInputElement>): void {
         setPlayerYaw(Number(event.currentTarget.value));
+    }
+    function captureEnemy(): void {
+        setEnemy((prev: Enemy): Enemy => {
+            const currentRelAngle: number = relativeAngle(
+                prev.worldYaw,
+                playerYaw
+            );
+
+            return {
+                ...prev,
+                capture: tryCapture(prev.capture, currentRelAngle)
+            };
+        });
     }
     useEffect((): (() => void) => {
         let frameId: number = 0;
@@ -68,6 +81,18 @@ export default function GameScreen(): ReactElement {
                 value={enemy.capture.progressMs}
                 max={captureTimeMs}
             />
+
+            <button
+                type="button"
+                onClick={captureEnemy}
+                disabled={enemy.capture.isCaptured}
+            >
+                捕獲
+            </button>
+
+            <p>
+                {enemy.capture.isCaptured ? "捕獲成功！" : "敵を探してください"}
+            </p>
 
             <a href="?page=audio">
                 音響テスト画面に戻る
