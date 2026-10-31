@@ -1,17 +1,18 @@
 import type { ChangeEvent, ReactElement } from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Enemy } from "../game/types.ts";
-import { createEnemy } from "../game/EnemyManager.ts";
 import { relativeAngle, isInCaptureRange,captureTimeMs, updateCapture, tryCapture } from "../game/capture.ts";
 import type { CaptureState } from "../game/capture.ts";
+import { createRandomEnemy } from "../game/EnemyManager.ts";
 
 // ゲーム画面
 export default function GameScreen(): ReactElement {
     const [playerYaw, setPlayerYaw] = useState<number>(0);
     const [score, setScore] = useState<number>(0);
     const [enemy, setEnemy] = useState<Enemy>(
-        (): Enemy => createEnemy(90, 2, "enemy-1")
+        (): Enemy => createRandomEnemy(2, "enemy-1")
     );
+    const enemySeq = useRef<number>(1);
     const relAngle: number = relativeAngle(enemy.worldYaw, playerYaw);
     const inRange: boolean = isInCaptureRange(relAngle);
     function changePlayerYaw(event:ChangeEvent<HTMLInputElement>): void {
@@ -32,11 +33,13 @@ export default function GameScreen(): ReactElement {
             return;
         }
 
-        setEnemy({
-            ...enemy,
-            capture: nextCapture
-        });
+        enemySeq.current +=1;
 
+        const nextEnemy: Enemy = createRandomEnemy(
+            2,
+            `enemy-${enemySeq.current}`
+        );
+        setEnemy(nextEnemy);
         setScore((prev: number): number => prev + 100);
     }
     useEffect((): (() => void) => {
@@ -48,9 +51,14 @@ export default function GameScreen(): ReactElement {
             prevMs = nowMs;
 
             setEnemy((prev: Enemy): Enemy => {
+                const currentRelAngle: number = relativeAngle(
+                    prev.worldYaw,
+                    playerYaw
+                );
+                
                 return {
                     ...prev,
-                    capture: updateCapture(prev.capture, relAngle, dtMs)
+                    capture: updateCapture(prev.capture, currentRelAngle, dtMs)
                 };
             });
 
@@ -62,12 +70,17 @@ export default function GameScreen(): ReactElement {
         return (): void => {
             cancelAnimationFrame(frameId);
         };
-    }, [relAngle]);
+    }, [playerYaw]);
     return (
         <main>
             <h1>ECHO HUNT</h1>
             <h2>ゲーム画面</h2>
             <p>スコア：{score}点</p>
+
+            <p>
+                開発用：{enemy.id} ／ 敵の方向：
+                {enemy.worldYaw.toFixed(1)}°
+            </p>
             
             <label htmlFor="player-yaw">
                 開発用のプレイヤー方向：{playerYaw}°
