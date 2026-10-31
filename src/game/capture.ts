@@ -1,3 +1,4 @@
+import { wrapAngle } from "../sensors/heading.ts";
 // 捕捉範囲（単位：度）
 const captureRange: number = 15;
 
@@ -70,4 +71,12 @@ export function tryCapture(
         progressMs: state.progressMs,
         isCaptured: true
     };
+}
+
+export function relativeAngle(
+    enemyYaw: number,
+    playerYaw: number
+): number {
+    const relAngle: number = wrapAngle((enemyYaw - playerYaw) % 360);
+    return relAngle;
 }
