@@ -1,11 +1,18 @@
 import type { ChangeEvent, ReactElement } from "react";
 import { useState } from "react";
+import type { Enemy } from "../game/types.ts";
+import { createEnemy } from "../game/EnemyManager.ts";
+import { relativeAngle, isInCaptureRange } from "../game/capture.ts";
 
 // ゲーム画面
 export default function GameScreen(): ReactElement {
     const [playerYaw, setPlayerYaw] = useState<number>(0);
-        function changePlayerYaw(event: ChangeEvent<HTMLInputElement>):
-    void {
+    const [enemy] = useState<Enemy>(
+        (): Enemy => createEnemy(90, 2, "enemy-1")
+    );
+    const relAngle: number = relativeAngle(enemy.worldYaw, playerYaw);
+    const inRange: boolean = isInCaptureRange(relAngle);
+    function changePlayerYaw(event:ChangeEvent<HTMLInputElement>): void {
         setPlayerYaw(Number(event.currentTarget.value));
     }
     return (
@@ -26,6 +33,10 @@ export default function GameScreen(): ReactElement {
                 value={playerYaw}
                 onChange={changePlayerYaw}
             />
+
+            <p>
+                {inRange ? "捕捉範囲内" : "捕捉範囲外"}
+            </p>
 
             <a href="?page=audio">
                 音響テスト画面に戻る
