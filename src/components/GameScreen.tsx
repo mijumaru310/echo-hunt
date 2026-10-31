@@ -3,11 +3,12 @@ import { useState, useEffect } from "react";
 import type { Enemy } from "../game/types.ts";
 import { createEnemy } from "../game/EnemyManager.ts";
 import { relativeAngle, isInCaptureRange,captureTimeMs, updateCapture, tryCapture } from "../game/capture.ts";
-
+import type { CaptureState } from "../game/capture.ts";
 
 // ゲーム画面
 export default function GameScreen(): ReactElement {
     const [playerYaw, setPlayerYaw] = useState<number>(0);
+    const [score, setScore] = useState<number>(0);
     const [enemy, setEnemy] = useState<Enemy>(
         (): Enemy => createEnemy(90, 2, "enemy-1")
     );
@@ -17,17 +18,26 @@ export default function GameScreen(): ReactElement {
         setPlayerYaw(Number(event.currentTarget.value));
     }
     function captureEnemy(): void {
-        setEnemy((prev: Enemy): Enemy => {
-            const currentRelAngle: number = relativeAngle(
-                prev.worldYaw,
-                playerYaw
-            );
+        const currentRelAngle: number = relativeAngle(
+            enemy.worldYaw,
+            playerYaw
+        );
 
-            return {
-                ...prev,
-                capture: tryCapture(prev.capture, currentRelAngle)
-            };
+        const nextCapture: CaptureState = tryCapture(
+            enemy.capture,
+            currentRelAngle
+        );
+
+        if (enemy.capture.isCaptured || !nextCapture.isCaptured) {
+            return;
+        }
+
+        setEnemy({
+            ...enemy,
+            capture: nextCapture
         });
+
+        setScore((prev: number): number => prev + 100);
     }
     useEffect((): (() => void) => {
         let frameId: number = 0;
@@ -57,7 +67,8 @@ export default function GameScreen(): ReactElement {
         <main>
             <h1>ECHO HUNT</h1>
             <h2>ゲーム画面</h2>
-
+            <p>スコア：{score}点</p>
+            
             <label htmlFor="player-yaw">
                 開発用のプレイヤー方向：{playerYaw}°
             </label>
