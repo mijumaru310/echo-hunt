@@ -4,7 +4,7 @@ import './index.css'
 import App from './App.tsx'
 
 // ゲーム画面を追加
-import GameScreen from './components/GameScreen.tsx'
+import GameApp from './components/GameApp.tsx'
 
 // URLから表示するページを判断
 const params: URLSearchParams =
@@ -15,7 +15,7 @@ const isGamePage: boolean = params.get('page') === 'game'
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     {isGamePage ? (
-      <GameScreen />
+      <GameApp />
     ) : (
       <>
         <nav>
