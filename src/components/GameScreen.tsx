@@ -5,20 +5,30 @@ import { relativeAngle, isInCaptureRange,captureTimeMs, updateCapture, tryCaptur
 import type { CaptureState } from "../game/capture.ts";
 import { createRandomEnemy } from "../game/EnemyManager.ts";
 
+
+const gameTimeMs: number = 60000;
 // ゲーム画面
 export default function GameScreen(): ReactElement {
     const [playerYaw, setPlayerYaw] = useState<number>(0);
     const [score, setScore] = useState<number>(0);
+    const [remainingMs, setRemainingMs] = useState<number>(gameTimeMs);
+    const endTimeMs = useRef<number>(0);
     const [enemy, setEnemy] = useState<Enemy>(
         (): Enemy => createRandomEnemy(2, "enemy-1")
     );
     const enemySeq = useRef<number>(1);
     const relAngle: number = relativeAngle(enemy.worldYaw, playerYaw);
     const inRange: boolean = isInCaptureRange(relAngle);
+    const isFinished: boolean = remainingMs <= 0;
     function changePlayerYaw(event:ChangeEvent<HTMLInputElement>): void {
         setPlayerYaw(Number(event.currentTarget.value));
     }
     function captureEnemy(): void {
+        if (performance.now() >= endTimeMs.current) {
+            setRemainingMs(0);
+            return;
+        }
+
         const currentRelAngle: number = relativeAngle(
             enemy.worldYaw,
             playerYaw
@@ -47,6 +57,11 @@ export default function GameScreen(): ReactElement {
         let prevMs: number = performance.now();
 
         function tick(nowMs: number): void {
+            if (performance.now() >= endTimeMs.current) {
+                setRemainingMs(0);
+                return;
+            }
+
             const dtMs: number = nowMs - prevMs;
             prevMs = nowMs;
 
@@ -71,11 +86,33 @@ export default function GameScreen(): ReactElement {
             cancelAnimationFrame(frameId);
         };
     }, [playerYaw]);
+
+    useEffect((): (() => void) => {
+        endTimeMs.current = performance.now() + gameTimeMs;
+
+        const timerId: number = window.setInterval((): void => {
+            const nextRemainingMs: number = Math.max(
+                0,
+                endTimeMs.current - performance.now()
+            );
+            setRemainingMs(nextRemainingMs);
+
+            if (nextRemainingMs === 0) {
+                window.clearInterval(timerId);
+            }
+        }, 100);
+
+        return (): void => {
+            window.clearInterval(timerId);
+        };
+    }, []);
     return (
         <main>
             <h1>ECHO HUNT</h1>
             <h2>ゲーム画面</h2>
             <p>スコア：{score}点</p>
+
+            <p>残り時間：{Math.ceil(remainingMs / 1000)}秒</p>
 
             <p>
                 開発用：{enemy.id} ／ 敵の方向：
@@ -94,6 +131,7 @@ export default function GameScreen(): ReactElement {
                 step={1}
                 value={playerYaw}
                 onChange={changePlayerYaw}
+                disabled={isFinished}
             />
 
             <p>
@@ -109,13 +147,13 @@ export default function GameScreen(): ReactElement {
             <button
                 type="button"
                 onClick={captureEnemy}
-                disabled={enemy.capture.isCaptured}
+                disabled={isFinished || enemy.capture.isCaptured || !inRange}
             >
                 捕獲
             </button>
 
             <p>
-                {enemy.capture.isCaptured ? "捕獲成功！" : "敵を探してください"}
+                {isFinished ? "終了！" : "敵を探してください"}
             </p>
 
             <a href="?page=audio">
