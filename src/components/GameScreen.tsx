@@ -5,6 +5,8 @@ import { relativeAngle, isInCaptureRange,captureTimeMs, updateCapture, tryCaptur
 import type { CaptureState } from "../game/capture.ts";
 import { createRandomEnemy } from "../game/EnemyManager.ts";
 import { SpatialAudio } from "../audio/SpatialAudioEngine.ts";
+import { OrientationController } from "../sensors/OrientationController.ts";
+import type { OrientationData } from "../sensors/OrientationController.ts";
 
 interface GameScreeenProps {
     onFinish: (score: number) => void;    
@@ -22,13 +24,52 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
     );
     const enemySeq = useRef<number>(1);
     const audioRef = useRef<SpatialAudio | null>(null);
+    const sensorRef = useRef<OrientationController | null>(null);
+    const playerYawRef = useRef<number>(playerYaw);
     const relAngle: number = relativeAngle(enemy.worldYaw, playerYaw);
     const relAngleRef = useRef<number>(relAngle);
     const inRange: boolean = isInCaptureRange(relAngle);
     const isFinished: boolean = remainingMs <= 0;
-    function changePlayerYaw(event:ChangeEvent<HTMLInputElement>): void {
+
+    function changePlayerYaw(event: ChangeEvent<HTMLInputElement>): void {
+        const sensor: OrientationController | null = sensorRef.current;
+        sensorRef.current = null;
+        sensor?.dispose();
+
         setPlayerYaw(Number(event.currentTarget.value));
     }
+
+    async function startSensor(): Promise<void> {
+        if (sensorRef.current !== null) {
+            return;
+        }
+
+        const sensor: OrientationController = new OrientationController();
+        sensorRef.current = sensor;
+
+        sensor.subscribe((data: OrientationData): void => {
+            if (sensorRef.current === sensor) {
+                setPlayerYaw(data.yaw);
+            }
+        });
+
+        try {
+            await sensor.start();
+
+            if (sensorRef.current !== sensor) {
+                sensor.dispose();
+            }
+        } catch (error: unknown) {
+            sensor.dispose();
+
+            if (sensorRef.current === sensor) {
+                sensorRef.current = null;
+                console.error(error);
+                window.alert("センサーを開始できませんでした。");
+            }
+        }
+    }
+
     async function startAudio(targetEnemy: Enemy): Promise<void> {
         let audio: SpatialAudio | null = audioRef.current;
 
@@ -116,10 +157,12 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
             const dtMs: number = nowMs - prevMs;
             prevMs = nowMs;
 
+            const currentPlayerYaw: number = playerYawRef.current;
+
             setEnemy((prev: Enemy): Enemy => {
                 const currentRelAngle: number = relativeAngle(
                     prev.worldYaw,
-                    playerYaw
+                    currentPlayerYaw
                 );
                 
                 return {
@@ -136,7 +179,7 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
         return (): void => {
             cancelAnimationFrame(frameId);
         };
-    }, [playerYaw]);
+    }, []);
 
     useEffect((): (() => void) => {
         endTimeMs.current = performance.now() + gameTimeMs;
@@ -164,6 +207,9 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
     }, [isFinished, score , onFinish]);
         useEffect((): (() => void) => {
         return (): void => {
+            const sensor: OrientationController | null = sensorRef.current;
+            sensorRef.current = null;
+            sensor?.dispose();
             const audio: SpatialAudio | null = audioRef.current;
             audioRef.current = null;
 
@@ -175,6 +221,7 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
         };
     }, []);
     useEffect((): void => {
+        playerYawRef.current = playerYaw;
         relAngleRef.current = relAngle;
 
         audioRef.current?.setEnemyPosition(
@@ -183,7 +230,7 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
             0,
             enemy.distance
         );
-    }, [enemy.id, enemy.distance, relAngle]);
+    }, [enemy.id, enemy.distance, playerYaw, relAngle]);
     return (
         <main>
             <h1>ECHO HUNT</h1>
@@ -196,6 +243,17 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
             >   
                 音声を再生
             </button>
+
+            <button
+                type="button"
+                onClick={(): void => {
+                    void startSensor();
+                }}
+                disabled={isFinished}
+            >
+                センサー開始
+            </button>
+
             <p>スコア：{score}点</p>
 
             <p>残り時間：{Math.ceil(remainingMs / 1000)}秒</p>
