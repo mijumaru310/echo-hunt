@@ -4,6 +4,7 @@ import type { Enemy } from "../game/types.ts";
 import { relativeAngle, isInCaptureRange,captureTimeMs, updateCapture, tryCapture } from "../game/capture.ts";
 import type { CaptureState } from "../game/capture.ts";
 import { createRandomEnemy } from "../game/EnemyManager.ts";
+import { SpatialAudio } from "../audio/SpatialAudioEngine.ts";
 
 interface GameScreeenProps {
     onFinish: (score: number) => void;    
@@ -20,11 +21,42 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
         (): Enemy => createRandomEnemy(2, "enemy-1")
     );
     const enemySeq = useRef<number>(1);
+    const audioRef = useRef<SpatialAudio | null>(null);
     const relAngle: number = relativeAngle(enemy.worldYaw, playerYaw);
     const inRange: boolean = isInCaptureRange(relAngle);
     const isFinished: boolean = remainingMs <= 0;
     function changePlayerYaw(event:ChangeEvent<HTMLInputElement>): void {
         setPlayerYaw(Number(event.currentTarget.value));
+    }
+    async function startAudio(): Promise<void> {
+        let audio: SpatialAudio | null = audioRef.current;
+
+        if (audio === null) {
+            audio = new SpatialAudio();
+            audioRef.current = audio;
+        }
+
+        const requestSeq: number = enemySeq.current;
+
+        try {
+            await audio.playEnemy(enemy.id,"/sounds/footstep.wav",{
+                azimuthDeg: relAngle,
+                elevationDeg: 0,
+                distance: enemy.distance,
+            });
+
+            if (
+                audioRef.current !== audio ||
+                enemySeq.current !== requestSeq
+            ){
+                audio.stopEnemy(enemy.id);
+            }
+        } catch (error: unknown) {
+            console.error(error);
+            if(audioRef.current === audio){
+            window.alert("音声の再生に失敗しました。");
+            }
+        }
     }
     function captureEnemy(): void {
         if (performance.now() >= endTimeMs.current) {
@@ -45,6 +77,7 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
         if (enemy.capture.isCaptured || !nextCapture.isCaptured) {
             return;
         }
+        audioRef.current?.stopEnemy(enemy.id);
 
         enemySeq.current +=1;
 
@@ -114,10 +147,25 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
             onFinish(score);
         }
     }, [isFinished, score , onFinish]);
+        useEffect((): (() => void) => {
+        return (): void => {
+            const audio: SpatialAudio | null = audioRef.current;
+            audioRef.current = null;
+
+            if (audio !== null) {
+                void audio.dispose().catch((error: unknown): void => {
+                    console.error(error);
+                });
+            }
+        };
+    }, []);
     return (
         <main>
             <h1>ECHO HUNT</h1>
             <h2>ゲーム画面</h2>
+            <button type="button" onClick={startAudio}disabled={isFinished}>
+                音声を再生
+            </button>
             <p>スコア：{score}点</p>
 
             <p>残り時間：{Math.ceil(remainingMs / 1000)}秒</p>
