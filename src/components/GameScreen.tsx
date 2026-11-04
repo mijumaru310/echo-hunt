@@ -12,10 +12,13 @@ interface GameScreeenProps {
     onFinish: (score: number) => void;    
 }
 
+type InputStatus = "pc" | "waiting" | "sensor";
+
 const gameTimeMs: number = 60000;
 // ゲーム画面
 export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement {
     const [playerYaw, setPlayerYaw] = useState<number>(0);
+    const [inputStatus, setInputStatus] = useState<InputStatus>("pc");
     const [score, setScore] = useState<number>(0);
     const [remainingMs, setRemainingMs] = useState<number>(gameTimeMs);
     const endTimeMs = useRef<number>(0);
@@ -30,12 +33,19 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
     const relAngleRef = useRef<number>(relAngle);
     const inRange: boolean = isInCaptureRange(relAngle);
     const isFinished: boolean = remainingMs <= 0;
+    let inputLabel: string = "PC入力";
+
+    if (inputStatus === "waiting") {
+        inputLabel = "センサー受信待ち";
+    } else if (inputStatus === "sensor") {
+        inputLabel = "センサー入力";
+    }
 
     function changePlayerYaw(event: ChangeEvent<HTMLInputElement>): void {
         const sensor: OrientationController | null = sensorRef.current;
         sensorRef.current = null;
         sensor?.dispose();
-
+        setInputStatus("pc");
         setPlayerYaw(Number(event.currentTarget.value));
     }
 
@@ -46,9 +56,10 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
 
         const sensor: OrientationController = new OrientationController();
         sensorRef.current = sensor;
-
+        setInputStatus("waiting");
         sensor.subscribe((data: OrientationData): void => {
             if (sensorRef.current === sensor) {
+                setInputStatus("sensor");
                 setPlayerYaw(data.yaw);
             }
         });
@@ -64,6 +75,7 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
 
             if (sensorRef.current === sensor) {
                 sensorRef.current = null;
+                setInputStatus("pc");
                 console.error(error);
                 window.alert("センサーを開始できませんでした。");
             }
@@ -249,10 +261,12 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
                 onClick={(): void => {
                     void startSensor();
                 }}
-                disabled={isFinished}
+                disabled={isFinished || inputStatus !== "pc"}
             >
                 センサー開始
             </button>
+
+            <p>入力：{inputLabel}</p>
 
             <p>スコア：{score}点</p>
 
