@@ -5,10 +5,13 @@ import { relativeAngle, isInCaptureRange,captureTimeMs, updateCapture, tryCaptur
 import type { CaptureState } from "../game/capture.ts";
 import { createRandomEnemy } from "../game/EnemyManager.ts";
 
+interface GameScreeenProps {
+    onFinish: (score: number) => void;    
+}
 
 const gameTimeMs: number = 60000;
 // ゲーム画面
-export default function GameScreen(): ReactElement {
+export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement {
     const [playerYaw, setPlayerYaw] = useState<number>(0);
     const [score, setScore] = useState<number>(0);
     const [remainingMs, setRemainingMs] = useState<number>(gameTimeMs);
@@ -106,6 +109,11 @@ export default function GameScreen(): ReactElement {
             window.clearInterval(timerId);
         };
     }, []);
+    useEffect((): void => {
+        if (isFinished) {
+            onFinish(score);
+        }
+    }, [isFinished, score , onFinish]);
     return (
         <main>
             <h1>ECHO HUNT</h1>
