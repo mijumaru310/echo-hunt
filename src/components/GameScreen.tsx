@@ -23,12 +23,13 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
     const enemySeq = useRef<number>(1);
     const audioRef = useRef<SpatialAudio | null>(null);
     const relAngle: number = relativeAngle(enemy.worldYaw, playerYaw);
+    const relAngleRef = useRef<number>(relAngle);
     const inRange: boolean = isInCaptureRange(relAngle);
     const isFinished: boolean = remainingMs <= 0;
     function changePlayerYaw(event:ChangeEvent<HTMLInputElement>): void {
         setPlayerYaw(Number(event.currentTarget.value));
     }
-    async function startAudio(): Promise<void> {
+    async function startAudio(targetEnemy: Enemy): Promise<void> {
         let audio: SpatialAudio | null = audioRef.current;
 
         if (audio === null) {
@@ -39,18 +40,26 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
         const requestSeq: number = enemySeq.current;
 
         try {
-            await audio.playEnemy(enemy.id,"/sounds/footstep.wav",{
-                azimuthDeg: relAngle,
+            await audio.playEnemy(targetEnemy.id,"/sounds/footstep.wav",{
+                azimuthDeg: relativeAngle(targetEnemy.worldYaw, playerYaw),
                 elevationDeg: 0,
-                distance: enemy.distance,
+                distance: targetEnemy.distance,
             });
 
             if (
                 audioRef.current !== audio ||
                 enemySeq.current !== requestSeq
-            ){
-                audio.stopEnemy(enemy.id);
+            ) {
+                audio.stopEnemy(targetEnemy.id);
+                return;
             }
+
+            audio.setEnemyPosition(
+                targetEnemy.id,
+                relAngleRef.current,
+                0,
+                targetEnemy.distance
+            );
         } catch (error: unknown) {
             console.error(error);
             if(audioRef.current === audio){
@@ -85,8 +94,14 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
             2,
             `enemy-${enemySeq.current}`
         );
+        relAngleRef.current = relativeAngle(nextEnemy.worldYaw, playerYaw);
+
         setEnemy(nextEnemy);
         setScore((prev: number): number => prev + 100);
+
+        if (audioRef.current !== null) {
+            void startAudio(nextEnemy);
+        }
     }
     useEffect((): (() => void) => {
         let frameId: number = 0;
@@ -159,11 +174,26 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
             }
         };
     }, []);
+    useEffect((): void => {
+        relAngleRef.current = relAngle;
+
+        audioRef.current?.setEnemyPosition(
+            enemy.id,
+            relAngle,
+            0,
+            enemy.distance
+        );
+    }, [enemy.id, enemy.distance, relAngle]);
     return (
         <main>
             <h1>ECHO HUNT</h1>
             <h2>ゲーム画面</h2>
-            <button type="button" onClick={startAudio}disabled={isFinished}>
+            <button type="button"
+            onClick={(): void => {
+                void startAudio(enemy);
+            }}
+            disabled={isFinished}
+            >   
                 音声を再生
             </button>
             <p>スコア：{score}点</p>
