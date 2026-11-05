@@ -1,16 +1,17 @@
 import type { ChangeEvent, ReactElement } from "react";
 import { useState, useEffect, useRef } from "react";
-import type { Enemy } from "../game/types.ts";
+import type { Enemy, EnemyMode } from "../game/types.ts";
 import { relativeAngle, isInCaptureRange,captureTimeMs, updateCapture, tryCapture } from "../game/capture.ts";
 import type { CaptureState } from "../game/capture.ts";
-import { createRandomEnemy } from "../game/EnemyManager.ts";
+import { createEnemyForMode, updateEnemyPosition } from "../game/EnemyManager.ts";
 import { SpatialAudio } from "../audio/SpatialAudioEngine.ts";
 import { OrientationController } from "../sensors/OrientationController.ts";
 import type { OrientationData } from "../sensors/OrientationController.ts";
 import { isDebug } from "../game/config.ts";
 
-interface GameScreeenProps {
+interface GameScreenProps {
     onFinish: (score: number) => void;    
+    enemyMode: EnemyMode;
 }
 
 type InputStatus = "pc" | "permission" | "waiting" | "sensor";
@@ -18,7 +19,7 @@ type AudioStatus = "idle" | "loading" | "ready" | "error";
 const gameTimeMs: number = 60000;
 const sensorWaitMs: number = 5000;
 // ゲーム画面
-export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement {
+export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): ReactElement {
     const [playerYaw, setPlayerYaw] = useState<number>(0);
     const [inputStatus, setInputStatus] = useState<InputStatus>("pc");
     const [score, setScore] = useState<number>(0);
@@ -27,7 +28,7 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
     const [audioStatus, setAudioStatus] = useState<AudioStatus>("idle");
     const endTimeMs = useRef<number>(0);
     const [enemy, setEnemy] = useState<Enemy>(
-        (): Enemy => createRandomEnemy(2, "enemy-1")
+        (): Enemy => createEnemyForMode(enemyMode, "enemy-1")
     );
     const enemySeq = useRef<number>(1);
     const audioRef = useRef<SpatialAudio | null>(null);
@@ -174,8 +175,8 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
 
         enemySeq.current +=1;
 
-        const nextEnemy: Enemy = createRandomEnemy(
-            2,
+        const nextEnemy: Enemy = createEnemyForMode(
+            enemyMode,
             `enemy-${enemySeq.current}`
         );
         relAngleRef.current = relativeAngle(nextEnemy.worldYaw, playerYaw);
@@ -207,14 +208,15 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
             const currentPlayerYaw: number = playerYawRef.current;
 
             setEnemy((prev: Enemy): Enemy => {
+                const movedEnemy: Enemy = updateEnemyPosition(prev, dtMs);
                 const currentRelAngle: number = relativeAngle(
-                    prev.worldYaw,
+                    movedEnemy.worldYaw,
                     currentPlayerYaw
                 );
                 
                 return {
-                    ...prev,
-                    capture: updateCapture(prev.capture, currentRelAngle, dtMs)
+                    ...movedEnemy,
+                    capture: updateCapture(movedEnemy.capture, currentRelAngle, dtMs)
                 };
             });
 
@@ -313,6 +315,7 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
         <main>
             <h1>ECHO HUNT</h1>
             <h2>ゲーム画面</h2>
+            <p>敵の種類：{enemyMode === "moving" ? "動く敵" : "静止する敵"}</p>
             <button type="button"
             onClick={(): void => {
                 void startAudio(enemy);
@@ -347,6 +350,7 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
             <p>
                 開発用：{enemy.id} ／ 敵の方向：
                 {enemy.worldYaw.toFixed(1)}°
+                ／ 移動速度：{enemy.angularVelocity}°/秒
             </p>
             
             <label htmlFor="player-yaw">

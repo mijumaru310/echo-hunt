@@ -1,5 +1,6 @@
 import type {ReactElement} from "react";
 import {useState} from "react";
+import type { EnemyMode } from "../game/types.ts";
 import TitleScreen from "./TitleScreen.tsx";
 import GameScreen from "./GameScreen.tsx";
 import ResultScreen from "./ResultScreen.tsx";
@@ -8,8 +9,14 @@ type Screen = "title" | "game" | "result";
 export default function GameApp(): ReactElement {
     const [screen, setScreen] = useState<Screen>("title");
     const [ResultScore, setResultScore] = useState<number>(0);
+    const [enemyMode, setEnemyMode] = useState<EnemyMode>("stationary");
 
-    function startGame(): void {
+    function startGame(nextMode: EnemyMode): void {
+        setEnemyMode(nextMode);
+        setScreen("game");
+    }
+
+    function restartGame(): void {
         setScreen("game");
     }
 
@@ -30,11 +37,11 @@ export default function GameApp(): ReactElement {
         return (
             <ResultScreen 
                 score={ResultScore} 
-                onRestart={startGame} 
+                onRestart={restartGame} 
                 onTitle={showTitle}
             />
         );
     }
 
-    return <GameScreen onFinish={finishGame} />;
+    return <GameScreen onFinish={finishGame} enemyMode={enemyMode} />;
 }
