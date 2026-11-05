@@ -78,7 +78,7 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
         inputLabel = "センサー入力";
     }
 
-    let gameMessage: string = "音声と入力を準備してください。";
+    let gameMessage: string = "";
     if (isFinished) {
         gameMessage = "終了！";
     } else if (isPaused) {
@@ -86,7 +86,7 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
             ? "音声を再生できませんでした。再開を押してやり直してください。"
             : audioStatus === "loading"
                 ? "再開のために音声を準備しています。"
-                : "一時停止中です。準備ができたら再開してください。";
+                : "";
     } else if (audioStatus === "error") {
         gameMessage = "音声を再生できませんでした。音声を再生し直してください。";
     } else if (audioStatus === "loading") {
@@ -95,12 +95,6 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
         gameMessage = "正面にしたい方向を向いて開始してください。";
     } else if (hasStarted && !isInputReady) {
         gameMessage = "方向入力の準備を待っています。";
-    } else if (canCapture) {
-        gameMessage = "ロックオン完了！タップで捕獲。";
-    } else if (isDebug && hasStarted && inRange) {
-        gameMessage = "その向きを保ってロックオン。";
-    } else if (hasStarted) {
-        gameMessage = "音の方向を探してください。";
     }
 
     // 更新ループからも最新の再生状態を読めるよう、参照と画面の状態を同時に更新する。
@@ -527,12 +521,13 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
     }, [captureNotice]);
 
     return (
-        <main className={isDebug ? "echo-game" : "echo-game ear-play"}>
-            <header className="game-heading">
-                <h1>ECHO HUNT</h1>
-                <h2>ゲーム画面</h2>
-                <p className="screen-note">敵の種類：{enemyMode === "moving" ? "動く敵" : "静止する敵"}</p>
-            </header>
+        <main className={isDebug ? "echo-game" : "echo-game ear-play"} data-playing={hasStarted} aria-label="ECHO HUNT">
+            {!hasStarted && (
+                <header className="game-heading">
+                    <h1>プレイ準備</h1>
+                    <p className="screen-note">敵の種類：{enemyMode === "moving" ? "動く敵" : "静止する敵"}</p>
+                </header>
+            )}
 
             {(!hasStarted || (!isPaused && (isDebug || audioStatus === "error"))) && (
                 <section className="preparation-panel" aria-label="プレイ準備">
@@ -573,32 +568,34 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
             )}
 
             <div className="game-stats">
-                <p>スコア：<strong>{score}</strong>点</p>
                 <p className={hasStarted && remainingMs <= 10000 ? "time-warning" : ""}>
-                    残り時間：<strong>{Math.ceil(remainingMs / 1000)}</strong>秒
+                    <span>残り時間：</span><strong>{Math.ceil(remainingMs / 1000)}</strong>秒
                 </p>
+                <p><span>スコア：</span><strong>{score}</strong>点</p>
+                {hasStarted && !isPaused && !isFinished && (
+                    <button className="pause-button" type="button" aria-label="一時停止" title="一時停止" onClick={pauseGame}>
+                        <svg aria-hidden="true" width="16" height="18" viewBox="0 0 16 18" fill="currentColor">
+                            <rect x="2" y="2" width="4" height="14" rx="1" />
+                            <rect x="10" y="2" width="4" height="14" rx="1" />
+                        </svg>
+                    </button>
+                )}
             </div>
 
-            {hasStarted && !isFinished && (
+            {isPaused && !isFinished && (
                 <section className="pause-panel" aria-label="一時停止操作">
-                    {isPaused ? (
-                        <>
-                            <h3>一時停止中</h3>
-                            <p className="screen-note">時間・敵の移動・ロックオン・音を停止しています。</p>
-                            <div className="pause-actions">
-                                <button className="primary-button" type="button" onClick={(): void => { void resumeGame(); }}
-                                    disabled={audioStatus === "loading" || !isInputReady}>
-                                    再開
-                                </button>
-                                <button type="button" onClick={recenterPlayer} disabled={audioStatus === "loading"}>
-                                    今の向きを正面に設定
-                                </button>
-                            </div>
-                            <p className="screen-note" role="status">{recenterMessage}</p>
-                        </>
-                    ) : (
-                        <button type="button" onClick={pauseGame}>一時停止</button>
-                    )}
+                    <h3>一時停止中</h3>
+                    <p className="screen-note">時間・敵の移動・ロックオン・音を停止しています。</p>
+                    <div className="pause-actions">
+                        <button className="primary-button" type="button" onClick={(): void => { void resumeGame(); }}
+                            disabled={audioStatus === "loading" || !isInputReady}>
+                            再開
+                        </button>
+                        <button type="button" onClick={recenterPlayer} disabled={audioStatus === "loading"}>
+                            今の向きを正面に設定
+                        </button>
+                    </div>
+                    <p className="screen-note" role="status">{recenterMessage}</p>
                 </section>
             )}
 
@@ -618,7 +615,7 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
             >
                 {canCapture ? "捕獲する" : hasStarted && !isPaused && isReady ? "探索中" : "捕獲"}
             </button>
-            <p className="game-status">{gameMessage}</p>
+            {gameMessage && <p className="game-status">{gameMessage}</p>}
 
             {isDebug && (
                 <section className="debug-panel" aria-label="PC確認用">
