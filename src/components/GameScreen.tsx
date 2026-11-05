@@ -12,9 +12,10 @@ interface GameScreeenProps {
     onFinish: (score: number) => void;    
 }
 
-type InputStatus = "pc" | "waiting" | "sensor";
+type InputStatus = "pc" | "permission" | "waiting" | "sensor";
 type AudioStatus = "idle" | "loading" | "ready" | "error";
 const gameTimeMs: number = 60000;
+const sensorWaitMs: number = 5000;
 // ゲーム画面
 export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement {
     const [playerYaw, setPlayerYaw] = useState<number>(0);
@@ -38,10 +39,12 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
     const canStart: boolean =
     !hasStarted &&
     audioStatus === "ready" &&
-    inputStatus !== "waiting";
+    (inputStatus === "pc" || inputStatus === "sensor");
     let inputLabel: string = "PC入力";
 
-    if (inputStatus === "waiting") {
+    if (inputStatus === "permission") {
+        inputLabel = "センサーの許可確認中";
+    } else if (inputStatus === "waiting") {
         inputLabel = "センサー受信待ち";
     } else if (inputStatus === "sensor") {
         inputLabel = "センサー入力";
@@ -70,7 +73,7 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
 
         const sensor: OrientationController = new OrientationController();
         sensorRef.current = sensor;
-        setInputStatus("waiting");
+        setInputStatus("permission");
         sensor.subscribe((data: OrientationData): void => {
             if (sensorRef.current === sensor) {
                 setInputStatus("sensor");
@@ -83,6 +86,11 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
 
             if (sensorRef.current !== sensor) {
                 sensor.dispose();
+                return;
+            }
+
+            if (sensor.getData() === null) {
+                setInputStatus("waiting");
             }
         } catch (error: unknown) {
             sensor.dispose();
@@ -271,6 +279,35 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
             enemy.distance
         );
     }, [enemy.id, enemy.distance, playerYaw, relAngle]);
+    useEffect((): void | (() => void) => {
+        if (inputStatus !== "waiting") {
+            return;
+        }
+
+        const sensor: OrientationController | null = sensorRef.current;
+
+        if (sensor === null || sensor.getData() !== null) {
+            return;
+        }
+
+        const timerId: number = window.setTimeout((): void => {
+            if (
+                sensorRef.current !== sensor ||
+                sensor.getData() !== null
+            ) {
+                return;
+            }
+
+            sensorRef.current = null;
+            sensor.dispose();
+            setInputStatus("pc");
+            window.alert("センサー値が届きませんでした。再試行するか、PC入力を使ってください。");
+        }, sensorWaitMs);
+
+        return (): void => {
+            window.clearTimeout(timerId);
+        };
+    }, [inputStatus]);
     return (
         <main>
             <h1>ECHO HUNT</h1>
