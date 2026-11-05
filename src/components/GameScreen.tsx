@@ -7,6 +7,7 @@ import { createRandomEnemy } from "../game/EnemyManager.ts";
 import { SpatialAudio } from "../audio/SpatialAudioEngine.ts";
 import { OrientationController } from "../sensors/OrientationController.ts";
 import type { OrientationData } from "../sensors/OrientationController.ts";
+import { isDebug } from "../game/config.ts";
 
 interface GameScreeenProps {
     onFinish: (score: number) => void;    
@@ -39,8 +40,8 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
     const canStart: boolean =
     !hasStarted &&
     audioStatus === "ready" &&
-    (inputStatus === "pc" || inputStatus === "sensor");
-    let inputLabel: string = "PC入力";
+    (inputStatus === "sensor" || (isDebug && inputStatus === "pc"));
+    let inputLabel: string = isDebug ? "PC入力" : "センサー未接続";
 
     if (inputStatus === "permission") {
         inputLabel = "センサーの許可確認中";
@@ -301,7 +302,7 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
             sensorRef.current = null;
             sensor.dispose();
             setInputStatus("pc");
-            window.alert("センサー値が届きませんでした。再試行するか、PC入力を使ってください。");
+            window.alert("センサー値が届きませんでした。もう一度センサー開始を押してください。");
         }, sensorWaitMs);
 
         return (): void => {
@@ -341,6 +342,8 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
 
             <p>残り時間：{Math.ceil(remainingMs / 1000)}秒</p>
 
+            {isDebug && (
+                <>
             <p>
                 開発用：{enemy.id} ／ 敵の方向：
                 {enemy.worldYaw.toFixed(1)}°
@@ -360,6 +363,8 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
                 onChange={changePlayerYaw}
                 disabled={isFinished}
             />
+                            </>
+            )}
 
             <p>
                 {inRange ? "捕捉範囲内" : "捕捉範囲外"}
@@ -383,9 +388,11 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
                 {isFinished ? "終了！" : "敵を探してください"}
             </p>
 
-            <a href="?page=audio">
-                音響テスト画面に戻る
-            </a>
+            {isDebug && (
+                <a href="?page=audio">
+                    音響テスト画面に戻る
+                </a>
+            )}
         </main>
     );
 }
