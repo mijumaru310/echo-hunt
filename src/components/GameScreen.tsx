@@ -82,7 +82,7 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
         gameMessage = "方向入力の準備を待っています。";
     } else if (canCapture) {
         gameMessage = "ロックオン完了！タップで捕獲。";
-    } else if (hasStarted && inRange) {
+    } else if (isDebug && hasStarted && inRange) {
         gameMessage = "その向きを保ってロックオン。";
     } else if (hasStarted) {
         gameMessage = "音の方向を探してください。";
@@ -571,14 +571,6 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
                 </section>
             )}
 
-            <section className={canCapture ? "lockon-panel is-locked" : "lockon-panel"} aria-label="ロックオン">
-                <div className="lockon-heading">
-                    <span>ロックオン</span>
-                    <strong>{lockOnPercent}%</strong>
-                </div>
-                <progress aria-label="ロックオンゲージ" value={enemy.capture.progressMs} max={captureTimeMs} />
-            </section>
-
             <div className="capture-feedback-slot" role="status" aria-live="polite" aria-atomic="true">
                 {captureNotice !== 0 && (
                     <div key={captureNotice} className="capture-feedback">
@@ -593,7 +585,7 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
                 onClick={captureEnemy}
                 disabled={!canCapture}
             >
-                捕獲
+                {canCapture ? "捕獲する" : hasStarted && !isPaused && isReady ? "探索中" : "捕獲"}
             </button>
             <p className="game-status">{gameMessage}</p>
 
@@ -611,6 +603,13 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
                         onChange={changePlayerYaw}
                         disabled={isFinished}
                     />
+                    <section className={canCapture ? "lockon-panel is-locked" : "lockon-panel"} aria-label="ロックオン">
+                        <div className="lockon-heading">
+                            <span>ロックオン</span>
+                            <strong>{lockOnPercent}%</strong>
+                        </div>
+                        <progress aria-label="ロックオンゲージ" value={enemy.capture.progressMs} max={captureTimeMs} />
+                    </section>
                     <p>{inRange ? "捕捉範囲内" : "捕捉範囲外"}</p>
                     <a href="?page=audio">音響テスト画面に戻る</a>
                 </section>
