@@ -8,6 +8,7 @@ import { SpatialAudio } from "../audio/SpatialAudioEngine.ts";
 import { OrientationController } from "../sensors/OrientationController.ts";
 import type { OrientationData } from "../sensors/OrientationController.ts";
 import { isDebug } from "../game/config.ts";
+import lockReadySound from "../assets/lock-ready.wav?inline";
 
 interface GameScreenProps {
     onFinish: (score: number) => void;    
@@ -53,6 +54,7 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
     );
     const enemySeq = useRef<number>(1);
     const audioRef = useRef<SpatialAudio | null>(null);
+    const cueSequence = useRef<number>(0);
     const audioStatusRef = useRef<AudioStatus>("idle");
     const sensorRef = useRef<OrientationController | null>(null);
     const playerYawRef = useRef<number>(playerYaw);
@@ -409,6 +411,26 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
             window.clearInterval(timerId);
         };
     }, [hasStarted, isPaused]);
+    // 捕獲可能になった瞬間だけ、足音とは別の音源で短く知らせる。
+    useEffect((): void | (() => void) => {
+        const audio: SpatialAudio | null = audioRef.current;
+        if (!canCapture || !audio) return;
+
+        const cueId: string = `lock-ready-${++cueSequence.current}`;
+        let cancelled: boolean = false;
+        void audio.playEnemy(cueId, lockReadySound, {
+            loop: false, volume: 0.3, azimuthDeg: 0, distance: 1
+        }).then((): void => {
+            if (cancelled) audio.stopEnemy(cueId);
+        }).catch((error: unknown): void => {
+            if (!cancelled) console.warn("ロックオンの合図音を再生できませんでした。", error);
+        });
+        return (): void => {
+            cancelled = true;
+            audio.stopEnemy(cueId);
+        };
+    }, [canCapture, enemy.id]);
+
     // 非表示の通知では、最新の敵と開始状態を使って停止する。
     const pauseOnHide = useEffectEvent((): void => {
         pauseGame();
@@ -505,7 +527,7 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
     }, [captureNotice]);
 
     return (
-        <main className="echo-game">
+        <main className={isDebug ? "echo-game" : "echo-game ear-play"}>
             <header className="game-heading">
                 <h1>ECHO HUNT</h1>
                 <h2>ゲーム画面</h2>

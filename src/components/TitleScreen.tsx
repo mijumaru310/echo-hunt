@@ -22,7 +22,7 @@ export default function TitleScreen({ onStart }: TitleScreenProps): ReactElement
         <main className="echo-game echo-title">
             <h1>ECHO HUNT</h1>
 
-            <p className="screen-note">足音のする方を向いて、「捕獲する」が表示されたらタップ。</p>
+            <p className="screen-note">足音のする方を向いて、ピッと鳴ったら{isDebug ? "「捕獲する」を" : "画面を"}タップ。</p>
             <p className="screen-note">イヤホンを着けて、60秒のハントに挑もう。</p>
 
             <div className="mode-selector">

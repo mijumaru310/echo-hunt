@@ -61,6 +61,9 @@
 .echo-game .capture-feedback strong { margin-left: 8px; font-size: 20px; }
 .echo-game .capture-button { width: 100%; min-height: 76px; border-radius: 18px; font-size: 24px; font-weight: 750; background: #27332d; }
 .echo-game .capture-button.is-ready { border-color: var(--echo-accent); background: var(--echo-accent); color: var(--echo-on-accent); box-shadow: 0 0 0 4px rgb(134 228 195 / 15%); }
+/* 捕獲可能な間だけ、通常画面の余白も同じボタンのタップ範囲にする。 */
+.ear-play .capture-button.is-ready::after { content: ""; position: fixed; inset: 0; z-index: 1; }
+.ear-play .pause-panel button { position: relative; z-index: 2; }
 .echo-game .game-status { min-height: 48px; margin-top: 12px; color: var(--echo-muted); text-align: center; font-size: 14px; line-height: 1.6; }
 .echo-game .debug-panel { margin-top: 20px; padding: 14px; border: 1px dashed var(--echo-line); border-radius: 12px; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
 .echo-game .debug-panel label { display: block; margin-top: 10px; }
