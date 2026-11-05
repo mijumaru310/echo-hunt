@@ -1,4 +1,5 @@
 import type {ReactElement} from "react";
+import { isDebug } from "../game/config.ts";
 
 interface TitleScreenProps {
     onStart: () => void;
@@ -13,12 +14,14 @@ export default function TitleScreen({ onStart }: TitleScreenProps): ReactElement
             <p>制限時間は60秒です。</p>
 
             <button type="button" onClick={onStart}>
-                ゲーム開始
+                プレイ準備へ
             </button>
 
-            <p>
-                <a href="?page=audio">音響テスト画面</a>
-            </p>
+           {isDebug && (
+                <p>
+                    <a href="?page=audio">音響テスト画面</a>
+                </p>
+            )}
         </main>
     );
 }
