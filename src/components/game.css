@@ -36,6 +36,10 @@
 .echo-game .preparation-panel { margin-bottom: 18px; padding: 14px; border: 1px solid var(--echo-line); border-radius: 16px; background: #e9f4f0; }
 .echo-game .preparation-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
 .echo-game .game-start { grid-column: 1 / -1; }
+.echo-game .pause-panel { margin-bottom: 18px; }
+.echo-game .pause-panel h3 { margin: 0; font-size: 18px; }
+.echo-game .pause-panel > button { width: 100%; }
+.echo-game .pause-actions { display: grid; gap: 8px; }
 .echo-game .game-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
 .echo-game .game-stats p { margin: 0; padding: 12px 8px; border: 1px solid var(--echo-line); border-radius: 14px; background: #fff; text-align: center; font-size: 13px; white-space: nowrap; }
 .echo-game .game-stats strong { margin: 0 3px; font-size: 25px; font-variant-numeric: tabular-nums; }

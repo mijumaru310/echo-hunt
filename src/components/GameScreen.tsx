@@ -1,9 +1,9 @@
 import type { ChangeEvent, ReactElement } from "react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useEffectEvent } from "react";
 import type { Enemy, EnemyMode } from "../game/types.ts";
 import { relativeAngle, isInCaptureRange,captureTimeMs, updateCapture, tryCapture } from "../game/capture.ts";
 import type { CaptureState } from "../game/capture.ts";
-import { createEnemyForMode, updateEnemyPosition } from "../game/EnemyManager.ts";
+import { createEnemyForMode, updateEnemyPosition, recenterEnemy } from "../game/EnemyManager.ts";
 import { SpatialAudio } from "../audio/SpatialAudioEngine.ts";
 import { OrientationController } from "../sensors/OrientationController.ts";
 import type { OrientationData } from "../sensors/OrientationController.ts";
@@ -25,6 +25,10 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
     const [score, setScore] = useState<number>(0);
     const [remainingMs, setRemainingMs] = useState<number>(gameTimeMs);
     const [hasStarted, setHasStarted] = useState<boolean>(false);
+    const [isPaused, setIsPaused] = useState<boolean>(false);
+    const pausedRef = useRef<boolean>(false);
+    const pausedRemainingMs = useRef<number>(gameTimeMs);
+    const [recenterMessage, setRecenterMessage] = useState<string>("");
     const [audioStatus, setAudioStatus] = useState<AudioStatus>("idle");
     const [captureNotice, setCaptureNotice] = useState<number>(0);
     const endTimeMs = useRef<number>(0);
@@ -43,7 +47,7 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
     const isInputReady: boolean = inputStatus === "sensor" || (isDebug && inputStatus === "pc");
     const isReady: boolean = audioStatus === "ready" && isInputReady;
     const canStart: boolean = !hasStarted && isReady;
-    const canCapture: boolean = hasStarted && !isFinished && isReady && inRange
+    const canCapture: boolean = hasStarted && !isPaused && !isFinished && isReady && inRange
         && enemy.capture.progressMs >= captureTimeMs && !enemy.capture.isCaptured;
     const lockOnPercent: number = Math.round(enemy.capture.progressMs / captureTimeMs * 100);
     let inputLabel: string = isDebug ? "PC入力" : "センサー未接続";
@@ -59,6 +63,12 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
     let gameMessage: string = "音声と入力を準備してください。";
     if (isFinished) {
         gameMessage = "終了！";
+    } else if (isPaused) {
+        gameMessage = audioStatus === "error"
+            ? "音声を再生できませんでした。再開を押してやり直してください。"
+            : audioStatus === "loading"
+                ? "再開のために音声を準備しています。"
+                : "一時停止中です。準備ができたら再開してください。";
     } else if (audioStatus === "error") {
         gameMessage = "音声を再生できませんでした。音声を再生し直してください。";
     } else if (audioStatus === "loading") {
@@ -81,19 +91,88 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
         setAudioStatus(status);
     }
 
-    function isReadyNow(): boolean {
+    function isInputReadyNow(): boolean {
         const sensor: OrientationController | null = sensorRef.current;
-        return audioRef.current !== null && audioStatusRef.current === "ready"
-            && (sensor !== null ? sensor.getData() !== null : isDebug);
+        return sensor !== null ? sensor.getData() !== null : isDebug;
+    }
+
+    function isReadyNow(): boolean {
+        return !pausedRef.current && audioRef.current !== null
+            && audioStatusRef.current === "ready" && isInputReadyNow();
     }
 
     function beginGame(): void {
-        if (!canStart || endTimeMs.current !== 0) {
+        if (!canStart || endTimeMs.current !== 0 || document.hidden) {
             return;
         }
 
         endTimeMs.current = performance.now() + gameTimeMs;
         setHasStarted(true);
+    }
+
+    // 音声の読み込み中でも取り消せるよう、停止時に再生エンジンを切り離す。
+    function releaseAudio(): void {
+        const audio: SpatialAudio | null = audioRef.current;
+        audioRef.current = null;
+        updateAudioStatus("idle");
+        if (audio !== null) {
+            audio.stopEnemy(enemy.id);
+            void audio.dispose().catch((error: unknown): void => {
+                console.error(error);
+            });
+        }
+    }
+
+    function pauseGame(): void {
+        if (hasStarted && !pausedRef.current) {
+            const nextRemainingMs: number = Math.max(0, endTimeMs.current - performance.now());
+            if (nextRemainingMs === 0) {
+                setRemainingMs(0);
+                releaseAudio();
+                return;
+            }
+            // 時間表示の更新間隔に依存せず、停止ボタンを押した時点の残り時間を保存する。
+            pausedRemainingMs.current = nextRemainingMs;
+            setRemainingMs(nextRemainingMs);
+            pausedRef.current = true;
+            setIsPaused(true);
+            setCaptureNotice(0);
+            setRecenterMessage("");
+        }
+        releaseAudio();
+    }
+
+    async function resumeGame(): Promise<void> {
+        if (!pausedRef.current || audioStatusRef.current === "loading"
+            || document.hidden || !isInputReadyNow()) {
+            return;
+        }
+
+        // 音が戻るまで停止を保ち、読み込み待ちの時間を制限時間から差し引かない。
+        const audioReady: boolean = await startAudio(enemy);
+        if (!audioReady || !pausedRef.current || document.hidden) {
+            return;
+        }
+        endTimeMs.current = performance.now() + pausedRemainingMs.current;
+        pausedRef.current = false;
+        setIsPaused(false);
+        setRecenterMessage("");
+    }
+
+    function recenterPlayer(): void {
+        if (!pausedRef.current || audioStatusRef.current === "loading") {
+            return;
+        }
+        const sensor: OrientationController | null = sensorRef.current;
+        const oldYaw: number = sensor !== null ? sensor.getYaw() : playerYawRef.current;
+        if (sensor !== null && !sensor.recenter()) {
+            setRecenterMessage("正面を設定できませんでした。スマホを少し動かして再度お試しください。");
+            return;
+        }
+        setEnemy((prev: Enemy): Enemy => recenterEnemy(prev, oldYaw));
+        playerYawRef.current = 0;
+        setPlayerYaw(0);
+        setRecenterMessage("今の向きを正面に設定しました。");
     }
 
     function changePlayerYaw(event: ChangeEvent<HTMLInputElement>): void {
@@ -142,7 +221,7 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
         }
     }
 
-    async function startAudio(targetEnemy: Enemy): Promise<void> {
+    async function startAudio(targetEnemy: Enemy): Promise<boolean> {
         let audio: SpatialAudio | null = audioRef.current;
 
         if (audio === null) {
@@ -165,7 +244,7 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
                 enemySeq.current !== requestSeq
             ) {
                 audio.stopEnemy(targetEnemy.id);
-                return;
+                return false;
             }
 
             audio.setEnemyPosition(
@@ -175,16 +254,18 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
                 targetEnemy.distance
             );
             updateAudioStatus("ready");
+            return true;
             
         } catch (error: unknown) {
-            console.error(error);
             if (audioRef.current === audio && enemySeq.current === requestSeq) {
+                console.error(error);
                 updateAudioStatus("error");
             }
+            return false;
         }
     }
     function captureEnemy(): void {
-        if(!hasStarted){
+        if(!hasStarted || pausedRef.current){
             return;
         }
 
@@ -229,7 +310,7 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
         }
     }
     useEffect((): void | (() => void) => {
-        if(!hasStarted){
+        if(!hasStarted || isPaused){
             return;
         }
 
@@ -237,6 +318,9 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
         let prevMs: number = performance.now();
 
         function tick(nowMs: number): void {
+            if (pausedRef.current) {
+                return;
+            }
             if (performance.now() >= endTimeMs.current) {
                 setRemainingMs(0);
                 return;
@@ -270,14 +354,17 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
         return (): void => {
             cancelAnimationFrame(frameId);
         };
-    }, [hasStarted]);
+    }, [hasStarted, isPaused]);
 
     useEffect((): void | (() => void) => {
-        if (!hasStarted) {
+        if (!hasStarted || isPaused) {
             return;
         }
 
-    const timerId: number = window.setInterval((): void => {
+        const timerId: number = window.setInterval((): void => {
+            if (pausedRef.current) {
+                return;
+            }
             const nextRemainingMs: number = Math.max(
                 0,
                 endTimeMs.current - performance.now()
@@ -292,13 +379,33 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
         return (): void => {
             window.clearInterval(timerId);
         };
-    }, [hasStarted]);
+    }, [hasStarted, isPaused]);
+    // 非表示の通知では、最新の敵と開始状態を使って停止する。
+    const pauseOnHide = useEffectEvent((): void => {
+        pauseGame();
+    });
+    useEffect((): (() => void) => {
+        function handleVisibility(): void {
+            if (document.hidden) {
+                pauseOnHide();
+            }
+        }
+        function handlePageHide(): void {
+            pauseOnHide();
+        }
+        document.addEventListener("visibilitychange", handleVisibility);
+        window.addEventListener("pagehide", handlePageHide);
+        return (): void => {
+            document.removeEventListener("visibilitychange", handleVisibility);
+            window.removeEventListener("pagehide", handlePageHide);
+        };
+    }, []);
     useEffect((): void => {
         if (isFinished) {
             onFinish(score);
         }
     }, [isFinished, score , onFinish]);
-        useEffect((): (() => void) => {
+    useEffect((): (() => void) => {
         return (): void => {
             const sensor: OrientationController | null = sensorRef.current;
             sensorRef.current = null;
@@ -376,7 +483,7 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
                 <p className="screen-note">敵の種類：{enemyMode === "moving" ? "動く敵" : "静止する敵"}</p>
             </header>
 
-            {(!hasStarted || isDebug || audioStatus === "error") && (
+            {(!hasStarted || (!isPaused && (isDebug || audioStatus === "error"))) && (
                 <section className="preparation-panel" aria-label="プレイ準備">
                     <div className="preparation-actions">
                         <button
@@ -414,6 +521,29 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
                     残り時間：<strong>{Math.ceil(remainingMs / 1000)}</strong>秒
                 </p>
             </div>
+
+            {hasStarted && !isFinished && (
+                <section className="pause-panel" aria-label="一時停止操作">
+                    {isPaused ? (
+                        <>
+                            <h3>一時停止中</h3>
+                            <p className="screen-note">時間・敵の移動・ロックオン・音を停止しています。</p>
+                            <div className="pause-actions">
+                                <button className="primary-button" type="button" onClick={(): void => { void resumeGame(); }}
+                                    disabled={audioStatus === "loading" || !isInputReady}>
+                                    再開
+                                </button>
+                                <button type="button" onClick={recenterPlayer} disabled={audioStatus === "loading"}>
+                                    今の向きを正面に設定
+                                </button>
+                            </div>
+                            <p className="screen-note" role="status">{recenterMessage}</p>
+                        </>
+                    ) : (
+                        <button type="button" onClick={pauseGame}>一時停止</button>
+                    )}
+                </section>
+            )}
 
             <section className={canCapture ? "lockon-panel is-locked" : "lockon-panel"} aria-label="ロックオン">
                 <div className="lockon-heading">

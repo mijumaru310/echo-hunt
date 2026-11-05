@@ -67,3 +67,11 @@ export function updateEnemyCapture(
     const relAngle: number = relativeAngle(enemy.worldYaw, playerYaw);
     enemy.capture = updateCapture(enemy.capture, relAngle, dtMs);
 }
+
+// 正面を変えても敵の見かけの方向が飛ばないよう、敵側の基準も同じだけずらす。
+export function recenterEnemy(enemy: Enemy, playerYaw: number): Enemy {
+    return {
+        ...enemy,
+        worldYaw: relativeAngle(enemy.worldYaw, playerYaw)
+    };
+}

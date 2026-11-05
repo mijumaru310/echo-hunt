@@ -6,7 +6,8 @@ import {
     createRandomEnemy,
     createEnemyForMode,
     updateEnemyPosition,
-    updateEnemyCapture
+    updateEnemyCapture,
+    recenterEnemy
 } from "../src/game/EnemyManager.ts";
 import { isInCaptureRange, relativeAngle, tryCapture } from "../src/game/capture.ts";
 
@@ -102,4 +103,39 @@ test("捕捉範囲は静止・移動とも正面のプラスマイナス15度を
     assert.equal(isInCaptureRange(-15), true);
     assert.equal(isInCaptureRange(15.01), false);
     assert.equal(isInCaptureRange(-15.01), false);
+});
+
+test("正面の再設定前後で敵の相対方向が変わらない", (): void => {
+    const enemy: Enemy = createEnemy(90, 2, "recenter", 12);
+    const rebased: Enemy = recenterEnemy(enemy, 30);
+    assert.equal(rebased.worldYaw, 60);
+    assert.equal(relativeAngle(rebased.worldYaw, 0), relativeAngle(enemy.worldYaw, 30));
+});
+
+test("正面の再設定は180度の境界をまたいでも同じ方向を保つ", (): void => {
+    for (let playerYaw: number = -179; playerYaw <= 179; playerYaw += 358) {
+        const enemy: Enemy = createEnemy(-playerYaw, 2, "boundary");
+        const rebased: Enemy = recenterEnemy(enemy, playerYaw);
+        assert.equal(relativeAngle(rebased.worldYaw, 0), relativeAngle(enemy.worldYaw, playerYaw));
+        assert.ok(rebased.worldYaw >= -180 && rebased.worldYaw < 180);
+    }
+});
+
+test("正面の再設定で元の敵や得た捕捉時間を変更しない", (): void => {
+    const enemy: Enemy = createEnemy(90, 2, "keep", -12);
+    enemy.capture = { progressMs: 350, isCaptured: false };
+    const rebased: Enemy = recenterEnemy(enemy, 30);
+    assert.notEqual(rebased, enemy);
+    assert.equal(enemy.worldYaw, 90);
+    assert.equal(rebased.id, enemy.id);
+    assert.equal(rebased.distance, enemy.distance);
+    assert.equal(rebased.angularVelocity, -12);
+    assert.deepEqual(rebased.capture, { progressMs: 350, isCaptured: false });
+});
+
+test("正面の再設定後も動く敵は同じ速さと方向で移動する", (): void => {
+    const enemy: Enemy = createEnemy(179, 2, "resume", 12);
+    const movedAfterRecenter: Enemy = updateEnemyPosition(recenterEnemy(enemy, 170), 500);
+    const recenteredAfterMove: Enemy = recenterEnemy(updateEnemyPosition(enemy, 500), 170);
+    assert.equal(movedAfterRecenter.worldYaw, recenteredAfterMove.worldYaw);
 });
