@@ -4,6 +4,7 @@ import type { EnemyMode } from "../game/types.ts";
 import TitleScreen from "./TitleScreen.tsx";
 import GameScreen from "./GameScreen.tsx";
 import ResultScreen from "./ResultScreen.tsx";
+import "./game.css";
 type Screen = "title" | "game" | "result";
 
 export default function GameApp(): ReactElement {
