@@ -18,10 +18,26 @@ type InputStatus = "pc" | "permission" | "waiting" | "sensor";
 type AudioStatus = "idle" | "loading" | "ready" | "error";
 const gameTimeMs: number = 60000;
 const sensorWaitMs: number = 5000;
+
+function sensorStartMessage(error: unknown): string {
+    if (!window.isSecureContext) {
+        return "センサーを使うには、HTTPSのゲームURLを開いてください。";
+    }
+    if (!("DeviceOrientationEvent" in window)) {
+        return "このブラウザは方向センサーに対応していません。スマホの対応ブラウザで開いてください。";
+    }
+    if (error instanceof Error && (error.name === "NotAllowedError"
+        || error.message === "センサーの利用が許可されませんでした")) {
+        return "センサーの利用が許可されていません。ブラウザのセンサー利用設定を確認して、「センサー開始」を押してください。";
+    }
+    return "センサーを開始できませんでした。「センサー開始」を押して再試行してください。";
+}
+
 // ゲーム画面
 export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): ReactElement {
     const [playerYaw, setPlayerYaw] = useState<number>(0);
     const [inputStatus, setInputStatus] = useState<InputStatus>("pc");
+    const [sensorError, setSensorError] = useState<string>("");
     const [score, setScore] = useState<number>(0);
     const [remainingMs, setRemainingMs] = useState<number>(gameTimeMs);
     const [hasStarted, setHasStarted] = useState<boolean>(false);
@@ -189,6 +205,7 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
         sensorRef.current = null;
         sensor?.dispose();
         setInputStatus("pc");
+        setSensorError("");
         setPlayerYaw(Number(event.currentTarget.value));
     }
 
@@ -204,6 +221,7 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
         }
         const sensor: OrientationController = new OrientationController();
         sensorRef.current = sensor;
+        setSensorError("");
         setInputStatus("permission");
         sensor.subscribe((data: OrientationData): void => {
             if (sensorRef.current === sensor) {
@@ -230,7 +248,7 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
                 sensorRef.current = null;
                 setInputStatus("pc");
                 console.error(error);
-                window.alert("センサーを開始できませんでした。");
+                setSensorError(sensorStartMessage(error));
             }
         }
     }
@@ -468,7 +486,7 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
             sensorRef.current = null;
             sensor.dispose();
             setInputStatus("pc");
-            window.alert("センサー値が届きませんでした。もう一度センサー開始を押してください。");
+            setSensorError("5秒間、向きのデータを受信できませんでした。「センサー開始」をもう一度押し、スマホを少し動かしてください。");
         }, sensorWaitMs);
 
         return (): void => {
@@ -525,6 +543,7 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
                         </button>
                     </div>
                     <p className="screen-note">入力：{inputLabel}</p>
+                    {sensorError && <p role="alert">{sensorError}</p>}
                     {!hasStarted && (
                         <>
                             <p className="screen-note" role="status">
