@@ -13,7 +13,7 @@ interface GameScreeenProps {
 }
 
 type InputStatus = "pc" | "waiting" | "sensor";
-
+type AudioStatus = "idle" | "loading" | "ready" | "error";
 const gameTimeMs: number = 60000;
 // ゲーム画面
 export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement {
@@ -21,6 +21,8 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
     const [inputStatus, setInputStatus] = useState<InputStatus>("pc");
     const [score, setScore] = useState<number>(0);
     const [remainingMs, setRemainingMs] = useState<number>(gameTimeMs);
+    const [hasStarted, setHasStarted] = useState<boolean>(false);
+    const [audioStatus, setAudioStatus] = useState<AudioStatus>("idle");
     const endTimeMs = useRef<number>(0);
     const [enemy, setEnemy] = useState<Enemy>(
         (): Enemy => createRandomEnemy(2, "enemy-1")
@@ -33,12 +35,24 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
     const relAngleRef = useRef<number>(relAngle);
     const inRange: boolean = isInCaptureRange(relAngle);
     const isFinished: boolean = remainingMs <= 0;
+    const canStart: boolean =
+    !hasStarted &&
+    audioStatus === "ready" &&
+    inputStatus !== "waiting";
     let inputLabel: string = "PC入力";
 
     if (inputStatus === "waiting") {
         inputLabel = "センサー受信待ち";
     } else if (inputStatus === "sensor") {
         inputLabel = "センサー入力";
+    }
+    function beginGame(): void {
+        if (!canStart || endTimeMs.current !== 0) {
+            return;
+        }
+
+        endTimeMs.current = performance.now() + gameTimeMs;
+        setHasStarted(true);
     }
 
     function changePlayerYaw(event: ChangeEvent<HTMLInputElement>): void {
@@ -92,6 +106,7 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
 
         const requestSeq: number = enemySeq.current;
 
+        setAudioStatus("loading");
         try {
             await audio.playEnemy(targetEnemy.id,"/sounds/footstep.wav",{
                 azimuthDeg: relativeAngle(targetEnemy.worldYaw, playerYaw),
@@ -113,14 +128,21 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
                 0,
                 targetEnemy.distance
             );
+            setAudioStatus("ready");
+            
         } catch (error: unknown) {
             console.error(error);
-            if(audioRef.current === audio){
-            window.alert("音声の再生に失敗しました。");
+            if (audioRef.current === audio && enemySeq.current === requestSeq) {
+                setAudioStatus("error");
+                window.alert("音声の再生に失敗しました。");
             }
         }
     }
     function captureEnemy(): void {
+        if(!hasStarted){
+            return;
+        }
+
         if (performance.now() >= endTimeMs.current) {
             setRemainingMs(0);
             return;
@@ -156,7 +178,11 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
             void startAudio(nextEnemy);
         }
     }
-    useEffect((): (() => void) => {
+    useEffect((): void | (() => void) => {
+        if(!hasStarted){
+            return;
+        }
+
         let frameId: number = 0;
         let prevMs: number = performance.now();
 
@@ -191,12 +217,14 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
         return (): void => {
             cancelAnimationFrame(frameId);
         };
-    }, []);
+    }, [hasStarted]);
 
-    useEffect((): (() => void) => {
-        endTimeMs.current = performance.now() + gameTimeMs;
+    useEffect((): void | (() => void) => {
+        if (!hasStarted) {
+            return;
+        }
 
-        const timerId: number = window.setInterval((): void => {
+    const timerId: number = window.setInterval((): void => {
             const nextRemainingMs: number = Math.max(
                 0,
                 endTimeMs.current - performance.now()
@@ -211,7 +239,7 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
         return (): void => {
             window.clearInterval(timerId);
         };
-    }, []);
+    }, [hasStarted]);
     useEffect((): void => {
         if (isFinished) {
             onFinish(score);
@@ -251,7 +279,7 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
             onClick={(): void => {
                 void startAudio(enemy);
             }}
-            disabled={isFinished}
+            disabled={isFinished || audioStatus === "loading"}
             >   
                 音声を再生
             </button>
@@ -264,6 +292,10 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
                 disabled={isFinished || inputStatus !== "pc"}
             >
                 センサー開始
+            </button>
+            
+            <button type="button" onClick={beginGame} disabled={!canStart}>
+                ゲーム開始
             </button>
 
             <p>入力：{inputLabel}</p>
@@ -305,7 +337,7 @@ export default function GameScreen({ onFinish }: GameScreeenProps): ReactElement
             <button
                 type="button"
                 onClick={captureEnemy}
-                disabled={isFinished || enemy.capture.isCaptured || !inRange}
+                                disabled={!hasStarted || isFinished || enemy.capture.isCaptured || !inRange}
             >
                 捕獲
             </button>
