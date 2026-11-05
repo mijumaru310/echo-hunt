@@ -45,7 +45,6 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
     const pausedRef = useRef<boolean>(false);
     const pausedRemainingMs = useRef<number>(gameTimeMs);
     const [recenterMessage, setRecenterMessage] = useState<string>("");
-    const [isCalibrated, setIsCalibrated] = useState<boolean>(false);
     const [audioStatus, setAudioStatus] = useState<AudioStatus>("idle");
     const [captureNotice, setCaptureNotice] = useState<number>(0);
     const endTimeMs = useRef<number>(0);
@@ -63,7 +62,7 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
     const isFinished: boolean = remainingMs <= 0;
     const isInputReady: boolean = inputStatus === "sensor" || (isDebug && inputStatus === "pc");
     const isReady: boolean = audioStatus === "ready" && isInputReady;
-    const canStart: boolean = !hasStarted && isReady && isCalibrated;
+    const canStart: boolean = !hasStarted && isReady;
     const canCapture: boolean = hasStarted && !isPaused && !isFinished && isReady && inRange
         && enemy.capture.progressMs >= captureTimeMs && !enemy.capture.isCaptured;
     const lockOnPercent: number = Math.round(enemy.capture.progressMs / captureTimeMs * 100);
@@ -90,10 +89,8 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
         gameMessage = "音声を再生できませんでした。音声を再生し直してください。";
     } else if (audioStatus === "loading") {
         gameMessage = "音声を準備しています。";
-    } else if (!hasStarted && canStart) {
-        gameMessage = "準備完了！ゲーム開始を押してください。";
-    } else if (!hasStarted && isInputReady && !isCalibrated) {
-        gameMessage = "正面にしたい向きを向き、「今の向きを正面に設定」を押してください。";
+    } else if (canStart) {
+        gameMessage = "正面にしたい方向を向いて開始してください。";
     } else if (hasStarted && !isInputReady) {
         gameMessage = "方向入力の準備を待っています。";
     } else if (canCapture) {
@@ -125,6 +122,9 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
             return;
         }
 
+        if (!recenterPlayer()) {
+            return;
+        }
         endTimeMs.current = performance.now() + gameTimeMs;
         setHasStarted(true);
     }
@@ -178,28 +178,27 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
         setRecenterMessage("");
     }
 
-    function recenterPlayer(): void {
+    function recenterPlayer(): boolean {
         if ((hasStarted && !pausedRef.current) || audioStatusRef.current === "loading"
             || !isInputReadyNow()) {
-            return;
+            return false;
         }
         const sensor: OrientationController | null = sensorRef.current;
         const oldYaw: number = sensor !== null ? sensor.getYaw() : playerYawRef.current;
         if (sensor !== null && !sensor.recenter()) {
             setRecenterMessage("正面を設定できませんでした。スマホを少し動かして再度お試しください。");
-            return;
+            return false;
         }
         setEnemy((prev: Enemy): Enemy => recenterEnemy(prev, oldYaw));
         playerYawRef.current = 0;
         setPlayerYaw(0);
-        setIsCalibrated(true);
-        setRecenterMessage("今の向きを正面に設定しました。");
+        setRecenterMessage(pausedRef.current ? "今の向きを正面に設定しました。" : "");
+        return true;
     }
 
     function changePlayerYaw(event: ChangeEvent<HTMLInputElement>): void {
         const sensor: OrientationController | null = sensorRef.current;
         if (!hasStarted && sensor !== null) {
-            setIsCalibrated(false);
             setRecenterMessage("");
         }
         sensorRef.current = null;
@@ -214,9 +213,7 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
             return;
         }
 
-        // 入力元を切り替えたら、新しいセンサーの基準で正面を決め直す。
         if (!hasStarted) {
-            setIsCalibrated(false);
             setRecenterMessage("");
         }
         const sensor: OrientationController = new OrientationController();
@@ -533,27 +530,20 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
                             センサー開始
                         </button>
                         {!hasStarted && (
-                            <button className="preparation-wide" type="button" onClick={recenterPlayer}
-                                disabled={!isInputReady || audioStatus === "loading"}>
-                                今の向きを正面に設定
+                            <button className="primary-button game-start" type="button" onClick={beginGame} disabled={!canStart}>
+                                この向きを正面にして開始
                             </button>
                         )}
-                        <button className="primary-button game-start" type="button" onClick={beginGame} disabled={!canStart}>
-                            ゲーム開始
-                        </button>
                     </div>
                     <p className="screen-note">入力：{inputLabel}</p>
                     {sensorError && <p role="alert">{sensorError}</p>}
                     {!hasStarted && (
                         <>
-                            <p className="screen-note" role="status">
-                                正面：{isCalibrated ? "設定済み" : "未設定"}
-                                {recenterMessage !== "" && <> ／ {recenterMessage}</>}
-                            </p>
+                            {recenterMessage && <p role="alert">{recenterMessage}</p>}
                             <p className="screen-note">
                                 {isDebug
-                                    ? "PCではスライダーで正面にしたい向きを決め、正面を設定してください。音声も再生すると開始できます。"
-                                    : "センサーを開始し、正面にしたい向きを設定してください。音声も再生すると開始できます。"}
+                                    ? "音声を再生し、スライダーで開始時の向きを選んでください。"
+                                    : "音声を再生し、センサーの利用を許可してください。"}
                             </p>
                         </>
                     )}
