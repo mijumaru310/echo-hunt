@@ -1,19 +1,24 @@
+:root:has(.echo-game) { background: #0b100e; }
+#root:has(.echo-game) { border-color: transparent; }
+
 .echo-game {
-    --echo-ink: #183b40;
-    --echo-muted: #526d72;
-    --echo-accent: #075e54;
-    --echo-line: #cbdedb;
+    --echo-ink: #edf4f1;
+    --echo-muted: #b6c6c0;
+    --echo-accent: #86e4c3;
+    --echo-surface: #202a25;
+    --echo-on-accent: #10231b;
+    --echo-line: #53645d;
     box-sizing: border-box;
     width: min(calc(100% - 24px), 480px);
     margin: 20px auto;
     padding: 24px;
     border: 1px solid var(--echo-line);
     border-radius: 24px;
-    background: #f4faf8;
+    background: #141b19;
     color: var(--echo-ink);
-    color-scheme: light;
+    color-scheme: dark;
     text-align: left;
-    box-shadow: 0 12px 36px rgb(24 59 64 / 8%);
+    box-shadow: 0 12px 36px rgb(0 0 0 / 25%);
 }
 
 .echo-game * { box-sizing: border-box; }
@@ -21,19 +26,19 @@
 .echo-game h2 { margin: 0 0 8px; font-size: 18px; color: var(--echo-ink); }
 .echo-game .screen-note { color: var(--echo-muted); font-size: 14px; line-height: 1.6; }
 .echo-game button, .echo-game select { font: inherit; }
-.echo-game button { min-height: 48px; padding: 10px 14px; border: 1px solid var(--echo-line); border-radius: 12px; background: #fff; color: var(--echo-ink); cursor: pointer; touch-action: manipulation; }
-.echo-game button:disabled { cursor: not-allowed; opacity: 0.5; }
-.echo-game button:focus-visible, .echo-game select:focus-visible, .echo-game input:focus-visible { outline: 3px solid #18a999; outline-offset: 3px; }
-.echo-game .primary-button { border-color: var(--echo-accent); background: var(--echo-accent); color: #fff; font-weight: 700; }
+.echo-game button { min-height: 48px; padding: 10px 14px; border: 1px solid var(--echo-line); border-radius: 12px; background: var(--echo-surface); color: var(--echo-ink); cursor: pointer; touch-action: manipulation; }
+.echo-game button:disabled { cursor: not-allowed; color: var(--echo-muted); background: #26312b; border-color: #425149; }
+.echo-game button:focus-visible, .echo-game select:focus-visible, .echo-game input:focus-visible { outline: 3px solid #acffe3; outline-offset: 3px; }
+.echo-game .primary-button { border-color: var(--echo-accent); background: var(--echo-accent); color: var(--echo-on-accent); font-weight: 700; }
 .echo-game .full-width { width: 100%; }
 .echo-game a { color: var(--echo-accent); }
 
 .echo-game .mode-selector { display: grid; gap: 8px; margin: 24px 0 12px; }
-.echo-game select { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid var(--echo-line); border-radius: 10px; background: #fff; color: var(--echo-ink); }
+.echo-game select { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid var(--echo-line); border-radius: 10px; background: var(--echo-surface); color: var(--echo-ink); }
 .echo-game .mode-description { min-height: 48px; margin-bottom: 20px; color: var(--echo-muted); font-size: 14px; line-height: 1.6; }
 .echo-game .debug-link { margin-top: 20px; font-size: 14px; }
 .echo-game .game-heading { margin-bottom: 18px; }
-.echo-game .preparation-panel { margin-bottom: 18px; padding: 14px; border: 1px solid var(--echo-line); border-radius: 16px; background: #e9f4f0; }
+.echo-game .preparation-panel { margin-bottom: 18px; padding: 14px; border: 1px solid var(--echo-line); border-radius: 16px; background: #19231f; }
 .echo-game .preparation-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
 .echo-game .game-start { grid-column: 1 / -1; }
 .echo-game .pause-panel { margin-bottom: 18px; }
@@ -41,27 +46,28 @@
 .echo-game .pause-panel > button { width: 100%; }
 .echo-game .pause-actions { display: grid; gap: 8px; }
 .echo-game .game-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
-.echo-game .game-stats p { margin: 0; padding: 12px 8px; border: 1px solid var(--echo-line); border-radius: 14px; background: #fff; text-align: center; font-size: 13px; white-space: nowrap; }
+.echo-game .game-stats p { margin: 0; padding: 12px 8px; border: 1px solid var(--echo-line); border-radius: 14px; background: var(--echo-surface); text-align: center; font-size: 13px; white-space: nowrap; }
 .echo-game .game-stats strong { margin: 0 3px; font-size: 25px; font-variant-numeric: tabular-nums; }
-.echo-game .game-stats .time-warning { color: #a43718; border-color: #e5ae9c; background: #fff4ed; }
-.echo-game .lockon-panel { padding: 16px; border: 1px solid var(--echo-line); border-radius: 16px; background: #fff; }
-.echo-game .lockon-panel.is-locked { border-color: #15836d; background: #e7f7ed; }
+.echo-game .game-stats .time-warning { color: #ffad9e; border-color: #925b50; background: #342420; }
+.echo-game .lockon-panel { padding: 16px; border: 1px solid var(--echo-line); border-radius: 16px; background: var(--echo-surface); }
+.echo-game .lockon-panel.is-locked { border-color: var(--echo-accent); background: #203d33; }
 .echo-game .lockon-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; font-size: 15px; }
 .echo-game progress { display: block; width: 100%; height: 18px; border: 0; border-radius: 999px; overflow: hidden; accent-color: var(--echo-accent); }
-.echo-game progress::-webkit-progress-bar { background: #dce9e5; border-radius: 999px; }
-.echo-game progress::-webkit-progress-value { background: #15836d; border-radius: 999px; }
-.echo-game progress::-moz-progress-bar { background: #15836d; border-radius: 999px; }
+.echo-game progress::-webkit-progress-bar { background: #303e38; border-radius: 999px; }
+.echo-game progress::-webkit-progress-value { background: var(--echo-accent); border-radius: 999px; }
+.echo-game progress::-moz-progress-bar { background: var(--echo-accent); border-radius: 999px; }
 .echo-game .capture-feedback-slot { display: grid; min-height: 68px; padding: 10px 0; place-items: center; }
-.echo-game .capture-feedback { width: 100%; padding: 10px 12px; border: 1px solid #93cdb4; border-radius: 12px; background: #dff5e8; color: #075e40; text-align: center; animation: echo-capture-pop 0.6s ease-out both; }
+.echo-game .capture-feedback { width: 100%; padding: 10px 12px; border: 1px solid #53967f; border-radius: 12px; background: #1c352b; color: var(--echo-accent); text-align: center; animation: echo-capture-pop 0.6s ease-out both; }
 .echo-game .capture-feedback strong { margin-left: 8px; font-size: 20px; }
-.echo-game .capture-button { width: 100%; min-height: 76px; border-radius: 18px; font-size: 24px; font-weight: 750; background: #e1ebe7; }
-.echo-game .capture-button.is-ready { border-color: var(--echo-accent); background: var(--echo-accent); color: #fff; box-shadow: 0 0 0 4px rgb(21 131 109 / 12%); }
+.echo-game .capture-button { width: 100%; min-height: 76px; border-radius: 18px; font-size: 24px; font-weight: 750; background: #27332d; }
+.echo-game .capture-button.is-ready { border-color: var(--echo-accent); background: var(--echo-accent); color: var(--echo-on-accent); box-shadow: 0 0 0 4px rgb(134 228 195 / 15%); }
 .echo-game .game-status { min-height: 48px; margin-top: 12px; color: var(--echo-muted); text-align: center; font-size: 14px; line-height: 1.6; }
-.echo-game .debug-panel { margin-top: 20px; padding: 14px; border: 1px dashed #91b5ae; border-radius: 12px; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.echo-game .debug-panel { margin-top: 20px; padding: 14px; border: 1px dashed var(--echo-line); border-radius: 12px; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
 .echo-game .debug-panel label { display: block; margin-top: 10px; }
 .echo-game .debug-panel input[type="range"] { width: 100%; min-height: 32px; margin: 6px 0; }
+.echo-game [role="alert"] { color: #ffad9e; }
 .echo-game .screen-actions { display: grid; gap: 10px; margin-top: 24px; }
-.echo-game .result-score { margin: 28px 0; padding: 22px 12px; border-radius: 18px; background: #fff; text-align: center; }
+.echo-game .result-score { margin: 28px 0; padding: 22px 12px; border-radius: 18px; background: var(--echo-surface); text-align: center; }
 .echo-game .result-score strong { margin: 0 6px; color: var(--echo-accent); font-size: 42px; font-variant-numeric: tabular-nums; }
 
 @keyframes echo-capture-pop {
