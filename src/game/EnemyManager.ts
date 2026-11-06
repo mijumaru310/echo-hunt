@@ -1,6 +1,17 @@
 import type { Enemy, EnemyMode } from "./types.ts";
 import { relativeAngle, updateCapture } from "./capture.ts";
 
+const spawnDistance: number = 3;
+export const contactDistance: number = 1;
+export const approachTimeMs: number = 15_000;
+// ラウンドの残り時間ではなく、現在の敵が到達するまでの時間。
+export function timeToContactMs(distance: number): number {
+    return Math.max(0, distance - contactDistance) * approachTimeMs / (spawnDistance - contactDistance);
+}
+export const enemyModeLabels: Record<EnemyMode, string> = {
+    stationary: "静止する敵", moving: "動く敵", approaching: "接近する敵"
+};
+
 export function createEnemy(
     worldYaw: number,
     distance: number,
@@ -37,12 +48,17 @@ export function createEnemyForMode(mode: EnemyMode, id: string): Enemy {
         ? (Math.random() < 0.5 ? -12 : 12)
         : 0;
 
-    return createRandomEnemy(2, id, angularVelocity);
+    return createRandomEnemy(mode === "approaching" ? spawnDistance : 2, id, angularVelocity);
 }
 
 // 経過時間から位置を更新する。元の敵データは直接変更しない。
-export function updateEnemyPosition(enemy: Enemy, dtMs: number): Enemy {
+export function updateEnemyPosition(enemy: Enemy, dtMs: number, mode?: EnemyMode): Enemy {
     const elapsedMs: number = Number.isFinite(dtMs) ? Math.max(0, dtMs) : 0;
+
+    if (mode === "approaching" && elapsedMs > 0) {
+        const travel: number = (spawnDistance - contactDistance) * elapsedMs / approachTimeMs;
+        return { ...enemy, distance: Math.max(contactDistance, enemy.distance - travel) };
+    }
 
     if (elapsedMs === 0 || enemy.angularVelocity === 0) {
         return enemy;

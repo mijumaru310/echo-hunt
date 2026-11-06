@@ -1,17 +1,18 @@
 import type { ChangeEvent, ReactElement } from "react";
 import { useState, useEffect, useRef, useEffectEvent } from "react";
-import type { Enemy, EnemyMode } from "../game/types.ts";
+import type { Enemy, EnemyMode, FinishReason } from "../game/types.ts";
 import { relativeAngle, isInCaptureRange,captureTimeMs, updateCapture, tryCapture } from "../game/capture.ts";
 import type { CaptureState } from "../game/capture.ts";
-import { createEnemyForMode, updateEnemyPosition, recenterEnemy } from "../game/EnemyManager.ts";
+import { createEnemyForMode, updateEnemyPosition, recenterEnemy, contactDistance, enemyModeLabels, timeToContactMs } from "../game/EnemyManager.ts";
 import { SpatialAudio } from "../audio/SpatialAudioEngine.ts";
 import { OrientationController } from "../sensors/OrientationController.ts";
 import type { OrientationData } from "../sensors/OrientationController.ts";
 import { isDebug } from "../game/config.ts";
 import lockReadySound from "../assets/lock-ready.wav?inline";
+import heartbeatSound from "../assets/heartbeat.wav?inline";
 
 interface GameScreenProps {
-    onFinish: (score: number) => void;    
+    onFinish: (score: number, reason: FinishReason) => void;
     enemyMode: EnemyMode;
 }
 
@@ -19,6 +20,7 @@ type InputStatus = "pc" | "permission" | "waiting" | "sensor";
 type AudioStatus = "idle" | "loading" | "ready" | "error";
 const gameTimeMs: number = 60000;
 const sensorWaitMs: number = 5000;
+const enemySoundUrl: string = "/sounds/footstep.wav";
 
 function sensorStartMessage(error: unknown): string {
     if (!window.isSecureContext) {
@@ -37,6 +39,7 @@ function sensorStartMessage(error: unknown): string {
 // ゲーム画面
 export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): ReactElement {
     const [playerYaw, setPlayerYaw] = useState<number>(0);
+    const [roomOriginYaw, setRoomOriginYaw] = useState<number>(0);
     const [inputStatus, setInputStatus] = useState<InputStatus>("pc");
     const [sensorError, setSensorError] = useState<string>("");
     const [score, setScore] = useState<number>(0);
@@ -61,13 +64,20 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
     const relAngle: number = relativeAngle(enemy.worldYaw, playerYaw);
     const relAngleRef = useRef<number>(relAngle);
     const inRange: boolean = isInCaptureRange(relAngle);
-    const isFinished: boolean = remainingMs <= 0;
+    const caught: boolean = enemyMode === "approaching" && enemy.distance <= contactDistance;
+    const isFinished: boolean = remainingMs <= 0 || caught;
     const isInputReady: boolean = inputStatus === "sensor" || (isDebug && inputStatus === "pc");
     const isReady: boolean = audioStatus === "ready" && isInputReady;
     const canStart: boolean = !hasStarted && isReady;
+    const contactMs: number = timeToContactMs(enemy.distance);
+    let heartbeatIntervalMs: number = 0;
+    if (enemyMode === "approaching" && hasStarted && isReady && !isPaused && !isFinished && contactMs <= 5000) {
+        heartbeatIntervalMs = contactMs <= 2000 ? 480 : 900;
+    }
     const canCapture: boolean = hasStarted && !isPaused && !isFinished && isReady && inRange
         && enemy.capture.progressMs >= captureTimeMs && !enemy.capture.isCaptured;
     const lockOnPercent: number = Math.round(enemy.capture.progressMs / captureTimeMs * 100);
+    const captureLabel: string = canCapture ? "捕獲する" : hasStarted && !isPaused && isReady ? "探索中" : "捕獲";
     let inputLabel: string = isDebug ? "PC入力" : "センサー未接続";
 
     if (inputStatus === "permission") {
@@ -186,6 +196,10 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
             return false;
         }
         setEnemy((prev: Enemy): Enemy => recenterEnemy(prev, oldYaw));
+        // 再校正で角度の原点だけが変わる。見ている壁はその場に保つ。
+        if (pausedRef.current) {
+            setRoomOriginYaw((origin: number): number => (origin + oldYaw) % 360);
+        }
         playerYawRef.current = 0;
         setPlayerYaw(0);
         setRecenterMessage(pausedRef.current ? "今の向きを正面に設定しました。" : "");
@@ -258,7 +272,8 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
 
         updateAudioStatus("loading");
         try {
-            await audio.playEnemy(targetEnemy.id,"/sounds/footstep.wav",{
+            await audio.playEnemy(targetEnemy.id, enemySoundUrl, {
+                volume: 0.8, // 静かな足音を補正してから距離による減衰を適用する。
                 azimuthDeg: relativeAngle(targetEnemy.worldYaw, playerYaw),
                 elevationDeg: 0,
                 distance: targetEnemy.distance,
@@ -358,7 +373,7 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
                 const currentPlayerYaw: number = playerYawRef.current;
 
                 setEnemy((prev: Enemy): Enemy => {
-                    const movedEnemy: Enemy = updateEnemyPosition(prev, dtMs);
+                    const movedEnemy: Enemy = updateEnemyPosition(prev, dtMs, enemyMode);
                     const currentRelAngle: number = relativeAngle(
                         movedEnemy.worldYaw,
                         currentPlayerYaw
@@ -379,7 +394,7 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
         return (): void => {
             cancelAnimationFrame(frameId);
         };
-    }, [hasStarted, isPaused]);
+    }, [hasStarted, isPaused, enemyMode]);
 
     useEffect((): void | (() => void) => {
         if (!hasStarted || isPaused) {
@@ -405,6 +420,37 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
             window.clearInterval(timerId);
         };
     }, [hasStarted, isPaused]);
+    // 敵の方向を示す足音と区別できるよう、心音は常に左右の中央で鳴らす。
+    useEffect((): void | (() => void) => {
+        const audio: SpatialAudio | null = audioRef.current;
+        if (!audio || heartbeatIntervalMs === 0) return;
+
+        const id: string = `heartbeat-${++cueSequence.current}`;
+        let stopped: boolean = false;
+        let pending: boolean = false;
+        async function beat(engine: SpatialAudio): Promise<void> {
+            if (stopped || pending || pausedRef.current || audioRef.current !== engine) return;
+            pending = true;
+            try {
+                await engine.playEnemy(id, heartbeatSound, {
+                    loop: false, azimuthDeg: 0, distance: 1, volume: 0.28
+                });
+                if (stopped) engine.stopEnemy(id);
+            } catch (error: unknown) {
+                if (!stopped) console.warn("心音を再生できませんでした。", error);
+            } finally {
+                pending = false;
+            }
+        }
+        void beat(audio);
+        const timer: number = window.setInterval(() => { void beat(audio); }, heartbeatIntervalMs);
+        return (): void => {
+            stopped = true;
+            window.clearInterval(timer);
+            audio.stopEnemy(id);
+        };
+    }, [heartbeatIntervalMs, enemy.id]);
+
     // 捕獲可能になった瞬間だけ、足音とは別の音源で短く知らせる。
     useEffect((): void | (() => void) => {
         const audio: SpatialAudio | null = audioRef.current;
@@ -447,9 +493,9 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
     }, []);
     useEffect((): void => {
         if (isFinished) {
-            onFinish(score);
+            onFinish(score, caught ? "caught" : "time");
         }
-    }, [isFinished, score , onFinish]);
+    }, [isFinished, score, onFinish, caught]);
     useEffect((): (() => void) => {
         return (): void => {
             const sensor: OrientationController | null = sensorRef.current;
@@ -522,10 +568,15 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
 
     return (
         <main className={isDebug ? "echo-game" : "echo-game ear-play"} data-playing={hasStarted} aria-label="ECHO HUNT">
+            {hasStarted && (
+                <div className="mansion-panorama" aria-hidden="true"
+                    style={{ backgroundPositionX: `calc(50% - var(--room-width) * ${(roomOriginYaw + playerYaw) / 360})` }}
+                />
+            )}
             {!hasStarted && (
                 <header className="game-heading">
                     <h1>プレイ準備</h1>
-                    <p className="screen-note">敵の種類：{enemyMode === "moving" ? "動く敵" : "静止する敵"}</p>
+                    <p className="screen-note">敵の種類：{enemyModeLabels[enemyMode]}</p>
                 </header>
             )}
 
@@ -612,8 +663,9 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
                 type="button"
                 onClick={captureEnemy}
                 disabled={!canCapture}
+                aria-label={captureLabel}
             >
-                {canCapture ? "捕獲する" : hasStarted && !isPaused && isReady ? "探索中" : "捕獲"}
+                {isDebug && captureLabel}
             </button>
             {gameMessage && <p className="game-status">{gameMessage}</p>}
 
