@@ -43,7 +43,6 @@
 .echo-game .game-start { grid-column: 1 / -1; }
 .echo-game .pause-panel { margin-bottom: 18px; }
 .echo-game .pause-panel h3 { margin: 0; font-size: 18px; }
-.echo-game .pause-panel > button { width: 100%; }
 .echo-game .pause-actions { display: grid; gap: 8px; }
 .echo-game .game-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
 .echo-game .game-stats p { margin: 0; padding: 12px 8px; border: 1px solid var(--echo-line); border-radius: 14px; background: var(--echo-surface); text-align: center; font-size: 13px; white-space: nowrap; }
@@ -61,9 +60,102 @@
 .echo-game .capture-feedback strong { margin-left: 8px; font-size: 20px; }
 .echo-game .capture-button { width: 100%; min-height: 76px; border-radius: 18px; font-size: 24px; font-weight: 750; background: #27332d; }
 .echo-game .capture-button.is-ready { border-color: var(--echo-accent); background: var(--echo-accent); color: var(--echo-on-accent); box-shadow: 0 0 0 4px rgb(134 228 195 / 15%); }
+.echo-game.ear-play .capture-button {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    color: var(--echo-muted);
+}
+.ear-play .capture-button.is-ready { color: var(--echo-accent); }
 /* 捕獲可能な間だけ、通常画面の余白も同じボタンのタップ範囲にする。 */
 .ear-play .capture-button.is-ready::after { content: ""; position: fixed; inset: 0; z-index: 1; }
-.ear-play .pause-panel button { position: relative; z-index: 2; }
+.echo-game[data-playing="true"] { display: flex; flex-direction: column; isolation: isolate; }
+.echo-game .mansion-panorama {
+    /* 画像1枚を360°として水平に繰り返す。横長でも同時に見える範囲は最大90°。 */
+    --room-width: max(400vw, 210dvh);
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: #14151b url("../assets/mansion-panorama.jpg") repeat-x center / var(--room-width) auto;
+}
+.echo-game .mansion-panorama::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgb(5 8 13 / 75%), rgb(5 8 13 / 17%) 22%, rgb(5 8 13 / 25%) 65%, rgb(5 8 13 / 50%));
+}
+.echo-game[data-playing="true"] :is(.game-stats, .capture-button, .capture-feedback, .game-status) {
+    text-shadow: 0 1px 4px #090c12;
+}
+.echo-game[data-playing="true"] :is(.pause-panel, .debug-panel) {
+    padding: 14px;
+    background: rgb(14 21 23 / 92%);
+}
+.echo-game[data-playing="true"] .game-stats {
+    order: -1;
+    grid-template-columns: 1fr 1fr 48px;
+    align-items: center;
+    gap: 6px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--echo-line);
+}
+.echo-game[data-playing="true"] .game-stats p { padding: 0; border: 0; border-radius: 0; background: transparent; text-align: left; }
+.echo-game[data-playing="true"] .game-stats p span { display: block; font-size: 12px; }
+.echo-game .game-stats p, .echo-game .result-score {
+    font-family: Georgia, "Times New Roman", "Yu Mincho", "Hiragino Mincho ProN", serif;
+    font-variant-numeric: lining-nums tabular-nums;
+}
+.echo-game .game-stats strong, .echo-game .result-score strong {
+    font-weight: 600;
+    font-variant-numeric: lining-nums tabular-nums;
+}
+.echo-game[data-playing="true"] .game-stats strong { margin-left: 0; }
+.echo-game .pause-button {
+    position: relative;
+    z-index: 2; /* 捕獲用の全面タップ範囲より手前に置く。 */
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+    color: var(--echo-muted);
+}
+.echo-game .pause-button:hover, .echo-game .pause-button:focus-visible { background: var(--echo-surface); color: var(--echo-ink); }
+
+/* 通常プレイでは画面全体を使い、中央の文字とタップ範囲を分離する。 */
+.echo-game.ear-play[data-playing="true"] {
+    width: 100%;
+    min-height: 100dvh;
+    margin: 0;
+    padding: 16px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+.ear-play[data-playing="true"] .game-stats { border-bottom: 0; }
+.ear-play[data-playing="true"] .capture-feedback { border: 0; background: transparent; }
+.ear-play[data-playing="true"]:not(:has(.pause-panel, .preparation-panel)) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 1fr auto 1fr;
+}
+.ear-play[data-playing="true"] .game-stats { grid-area: 1 / 1; align-self: start; }
+.ear-play[data-playing="true"] .capture-button { grid-area: 2 / 1; }
+/* 成功は上部の得点で示し、読み上げ用の通知だけを残す。 */
+.ear-play .capture-feedback-slot {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+}
+.ear-play[data-playing="true"] .game-status { grid-area: 1 / 1; align-self: end; }
 .echo-game .game-status { min-height: 48px; margin-top: 12px; color: var(--echo-muted); text-align: center; font-size: 14px; line-height: 1.6; }
 .echo-game .debug-panel { margin-top: 20px; padding: 14px; border: 1px dashed var(--echo-line); border-radius: 12px; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
 .echo-game .debug-panel label { display: block; margin-top: 10px; }

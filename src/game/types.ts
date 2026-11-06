@@ -1,6 +1,7 @@
 import type { CaptureState } from "./capture.ts";
 
-export type EnemyMode = "stationary" | "moving";
+export type EnemyMode = "stationary" | "moving" | "approaching";
+export type FinishReason = "time" | "caught";
 
 export interface Enemy {
     worldYaw: number;

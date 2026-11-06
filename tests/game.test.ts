@@ -11,6 +11,17 @@ import {
 } from "../src/game/EnemyManager.ts";
 import { isInCaptureRange, relativeAngle, tryCapture } from "../src/game/capture.ts";
 
+test("接近する敵は方位を保ち、7.5秒で距離2、15秒で到達する", (): void => {
+    const first: Enemy = createEnemyForMode("approaching", "first");
+    assert.equal(first.distance, 3);
+    const halfway: Enemy = updateEnemyPosition(first, 7500, "approaching");
+    assert.equal(halfway.distance, 2);
+    assert.equal(halfway.worldYaw, first.worldYaw);
+    assert.equal(updateEnemyPosition(halfway, 7500, "approaching").distance, 1);
+    assert.equal(updateEnemyPosition(first, 20000, "approaching").distance, 1);
+    assert.equal(createEnemyForMode("approaching", "next").distance, 3);
+});
+
 test("既存の生成方法は静止する敵を返す", (): void => {
     assert.equal(createEnemy(90, 2, "fixed").angularVelocity, 0);
     assert.equal(createRandomEnemy(2, "random").angularVelocity, 0);

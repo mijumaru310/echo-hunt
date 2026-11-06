@@ -1,6 +1,6 @@
 import type {ReactElement} from "react";
 import {useState} from "react";
-import type { EnemyMode } from "../game/types.ts";
+import type { EnemyMode, FinishReason } from "../game/types.ts";
 import TitleScreen from "./TitleScreen.tsx";
 import GameScreen from "./GameScreen.tsx";
 import ResultScreen from "./ResultScreen.tsx";
@@ -10,6 +10,7 @@ type Screen = "title" | "game" | "result";
 export default function GameApp(): ReactElement {
     const [screen, setScreen] = useState<Screen>("title");
     const [ResultScore, setResultScore] = useState<number>(0);
+    const [finishReason, setFinishReason] = useState<FinishReason>("time");
     const [enemyMode, setEnemyMode] = useState<EnemyMode>("stationary");
 
     function startGame(nextMode: EnemyMode): void {
@@ -21,7 +22,8 @@ export default function GameApp(): ReactElement {
         setScreen("game");
     }
 
-    function finishGame(score: number): void {
+    function finishGame(score: number, reason: FinishReason): void {
+        setFinishReason(reason);
         setResultScore(score);
         setScreen("result");
     }
@@ -37,7 +39,8 @@ export default function GameApp(): ReactElement {
     if (screen === "result") {
         return (
             <ResultScreen 
-                score={ResultScore} 
+                score={ResultScore}
+                reason={finishReason}
                 onRestart={restartGame} 
                 onTitle={showTitle}
             />
