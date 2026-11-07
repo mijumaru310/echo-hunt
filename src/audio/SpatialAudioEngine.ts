@@ -1,10 +1,15 @@
 
+import { createCueBuffer } from "./cues.ts";
+import type { CueKind } from "./cues.ts";
+
 export type PlayEnemyOptions = {
   loop?: boolean;
   volume?: number;
   azimuthDeg?: number;
   elevationDeg?: number;
   distance?: number;
+  playbackRate?: number;
+  spatial?: boolean;
 };
 
 type EnemySound = {
@@ -28,6 +33,8 @@ export class SpatialAudio {
   // 非同期読み込み中の停止・再生し直しを管理
   private pending = new Map<string, number>();
   private requestSequence = 0;
+  private cueCache = new Map<CueKind, AudioBuffer>();
+  private volume = 0.7;
 
   // ① AudioContextを初期化
   async initialize(): Promise<void> {
@@ -44,7 +51,7 @@ export class SpatialAudio {
 
     // 最終的な出力音量
     this.masterGain = new GainNode(ctx, {
-      gain: 0.2,
+      gain: this.volume * 0.3,
     });
 
     this.masterGain.connect(ctx.destination);
@@ -104,6 +111,7 @@ export class SpatialAudio {
 
     source.buffer = buffer;
     source.loop = options.loop ?? true;
+    source.playbackRate.value = options.playbackRate ?? 1;
 
     const panner = new PannerNode(ctx, {
       panningModel: "HRTF",
@@ -121,8 +129,12 @@ export class SpatialAudio {
     });
 
     // 音源 → 空間音響 → 個別音量 → 全体音量
-    source.connect(panner);
-    panner.connect(gain);
+    if (options.spatial === false) {
+      source.connect(gain);
+    } else {
+      source.connect(panner);
+      panner.connect(gain);
+    }
     gain.connect(masterGain);
 
     const sound: EnemySound = {
@@ -160,18 +172,18 @@ export class SpatialAudio {
     soundUrl: string,
     options: PlayEnemyOptions = {}
   ): Promise<void> {
-    await this.initialize();
-
     // 同じIDがあれば既存音源を停止
     this.stopEnemy(id);
+    const requestId = ++this.requestSequence;
+    this.pending.set(id, requestId);
+
+    await this.initialize();
+    if (this.pending.get(id) !== requestId) return;
 
     const ctx = this.ctx;
     if (!ctx) {
       throw new Error("AudioContextがありません");
     }
-
-    const requestId = ++this.requestSequence;
-    this.pending.set(id, requestId);
 
     const buffer = await this.loadBuffer(soundUrl, ctx);
 
@@ -186,6 +198,42 @@ export class SpatialAudio {
     this.pending.delete(id);
 
     this.createSound(id, buffer, options);
+  }
+
+  async preload(urls: readonly string[]): Promise<void> {
+    await this.initialize();
+    const ctx = this.ctx;
+    if (!ctx) throw new Error("AudioContextがありません");
+    await Promise.all([...new Set(urls)].map((url) => this.loadBuffer(url, ctx)));
+    if (this.ctx !== ctx) return;
+    const kinds: CueKind[] = ["strike", "collapse", "warning", "damage", "wave", "clear", "game-over", "countdown"];
+    for (const kind of kinds) this.cueCache.set(kind, createCueBuffer(ctx, kind));
+  }
+
+  /** 事前作成済みのSEは同期再生し、命中時の待ち時間をなくす。 */
+  playCue(id: string, kind: CueKind, options: PlayEnemyOptions = {}): void {
+    const buffer = this.cueCache.get(kind);
+    if (!buffer || !this.isRunning()) return;
+    this.stopEnemy(id);
+    this.createSound(id, buffer, { ...options, loop: false });
+  }
+
+  setMasterVolume(volume: number): void {
+    if (!Number.isFinite(volume)) return;
+    this.volume = Math.max(0, Math.min(1, volume));
+    if (this.masterGain) this.masterGain.gain.value = this.volume * 0.3;
+  }
+
+  isRunning(): boolean { return this.ctx?.state === "running"; }
+
+  stopAll(): void {
+    this.pending.clear();
+    for (const id of [...this.sounds.keys()]) this.stopEnemy(id);
+  }
+
+  async suspend(): Promise<void> {
+    this.stopAll();
+    if (this.ctx?.state === "running") await this.ctx.suspend();
   }
 
   // ④ 敵の位置を変更
@@ -266,6 +314,7 @@ export class SpatialAudio {
     }
 
     this.bufferCache.clear();
+    this.cueCache.clear();
 
     const ctx = this.ctx;
     this.ctx = null;

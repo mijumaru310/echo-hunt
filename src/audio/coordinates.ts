@@ -1,5 +1,5 @@
 //座標の定義
-// -zが正面, zが後ろ、　xが正面から右向き　yが上
+// -zが正面, zが後ろ、xが正面から右向き、yが上
 
 export interface Vector3{
     x: number;
@@ -19,7 +19,7 @@ z -rcos(Φ)cos(θ)
 */
 
 //θが azimuth、Φ が elevation
-//ただし　2次元でやるつもりなのでΦ=0として扱う
+// 2次元で扱う場合はΦ=0とする
 
 //直交座標から球面座標への変換関数
 export const sphericalToCartesian=(azimuthDeg: number,

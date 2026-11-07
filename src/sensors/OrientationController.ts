@@ -14,7 +14,7 @@ subscribe()	向きが変わるたびに通知を受ける
 import {
     getPhoneDirection,
     wrapAngle,
-} from "./heading";
+} from "./heading.ts";
 
 // ゲーム側へ渡すセンサーデータ
 export type OrientationData = {
@@ -40,6 +40,7 @@ export class OrientationController {
     private latestData: OrientationData | null = null;
 
     private running = false;
+    private startSequence = 0;
 
     // 更新の通知先を登録
     private listeners = new Set<OrientationListener>();
@@ -89,6 +90,7 @@ export class OrientationController {
     // センサー開始
     async start(): Promise<void> {
         if (this.running) return;
+        const sequence = ++this.startSequence;
 
         if (!window.isSecureContext) {
             throw new Error("HTTPS環境が必要です");
@@ -109,6 +111,9 @@ export class OrientationController {
                 throw new Error("センサーの利用が許可されませんでした");
             }
         }
+
+        // 権限ダイアログ中に画面が閉じられた場合は購読を開始しない。
+        if (sequence !== this.startSequence) return;
 
         window.addEventListener(
             "deviceorientation",
@@ -161,6 +166,7 @@ export class OrientationController {
 
     // センサー停止
     stop(): void {
+        this.startSequence++;
         window.removeEventListener(
             "deviceorientation",
             this.handleOrientation
