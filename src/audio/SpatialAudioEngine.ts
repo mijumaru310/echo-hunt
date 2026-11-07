@@ -1,5 +1,5 @@
 
-import { createCueBuffer } from "./cues.ts";
+import { createCueBuffer, cueKinds } from "./cues.ts";
 import type { CueKind } from "./cues.ts";
 
 export type PlayEnemyOptions = {
@@ -206,8 +206,9 @@ export class SpatialAudio {
     if (!ctx) throw new Error("AudioContextがありません");
     await Promise.all([...new Set(urls)].map((url) => this.loadBuffer(url, ctx)));
     if (this.ctx !== ctx) return;
-    const kinds: CueKind[] = ["strike", "collapse", "warning", "damage", "wave", "clear", "game-over", "countdown"];
-    for (const kind of kinds) this.cueCache.set(kind, createCueBuffer(ctx, kind));
+    for (const kind of cueKinds) {
+      if (!this.cueCache.has(kind)) this.cueCache.set(kind, createCueBuffer(ctx, kind));
+    }
   }
 
   /** 事前作成済みのSEは同期再生し、命中時の待ち時間をなくす。 */

@@ -1,14 +1,16 @@
-import type { CSSProperties, ReactElement } from "react";
+import type { ReactElement } from "react";
 import { useGameSession } from "../game/useGameSession.ts";
 import { enemyDefinitions } from "../game/enemies.ts";
-import { relativeAngle, isInCaptureRange } from "../game/capture.ts";
 import { isDebug } from "../game/config.ts";
 import { stageBackgroundStyle } from "./stagePresentation.ts";
-import type { GameResult, StageDefinition } from "../game/types.ts";
+import type { GameDifficulty, GameResult, StageDefinition } from "../game/types.ts";
 import type { GameSettings } from "../game/storage.ts";
+import { difficultyRules } from "../game/difficulty.ts";
+import CombatOverlay from "./CombatOverlay.tsx";
 
 interface GameScreenProps {
     stage: StageDefinition;
+    difficulty?: GameDifficulty;
     onFinish: (result: GameResult) => void;
     onTitle: () => void;
 }
@@ -26,18 +28,13 @@ function AudioSettings({ settings, onChange }: { settings: GameSettings; onChang
     );
 }
 
-export default function GameScreen({ stage, onFinish, onTitle }: GameScreenProps): ReactElement {
-    const game = useGameSession(stage, onFinish);
+export default function GameScreen({ stage, difficulty = "easy", onFinish, onTitle }: GameScreenProps): ReactElement {
+    const game = useGameSession(stage, difficulty, onFinish);
     const { snapshot, phase, feedback } = game;
-    const target = snapshot.enemies.find((enemy) => enemy.id === snapshot.targetId);
-    const inRange = target && isInCaptureRange(relativeAngle(target.worldYaw, game.playerYaw));
-    const progress = target && inRange ? Math.min(1, target.capture.progressMs / target.lockTimeMs) : 0;
-    const canAttack = phase === "playing" && progress >= 1;
+    const boss = snapshot.enemies.find((enemy) => enemyDefinitions[enemy.kind].boss);
+    const bossStage = stage.waves.some((wave) => wave.enemies.some((spawn) => enemyDefinitions[spawn.kind].boss));
     const inputLabels = { idle: "未接続", permission: "許可を確認中", waiting: "スマホを少し動かしてください", sensor: "接続済み", pc: "PC操作", error: "再接続してください" };
     const hasInputPending = game.inputStatus === "permission" || game.inputStatus === "waiting";
-    const titleText = phase === "countdown" ? "耳を澄ませて" : phase === "finished"
-        ? snapshot.result?.reason === "defeated" ? "闇に呑まれた" : "夜を越えた"
-        : canAttack ? "タップして撃破" : progress > 0 ? "その方向を捉えて" : "気配を探す";
 
     const inputControls = (
         <div className="input-controls">
@@ -57,15 +54,14 @@ export default function GameScreen({ stage, onFinish, onTitle }: GameScreenProps
             <main className="echo-game foyer" style={stageBackgroundStyle(stage.background)} aria-label="プレイ準備">
                 <button className="text-button back-link" type="button" onClick={onTitle}>← ステージ選択</button>
                 <div className="foyer-controls">
-                    <p className="eyebrow">BEFORE THE HUNT</p>
-                    <h1>音の向こうへ。</h1>
-                    <p className="stage-caption">{stage.name}</p>
+                    <h1>プレイ前の確認</h1>
+                    <p className="stage-caption">{stage.name} · {difficultyRules[difficulty].label}</p>
                     <ol className="setup-instructions">
                         <li>イヤホンをつけ、足音が右から聞こえるか確かめる。</li>
                         <li>スマホを顔の正面に持ち、体ごと向きを変える。</li>
-                        <li>ピッと鳴ったら画面をタップ。命中音のあと、敵の気配が消える。</li>
+                        <li>{difficulty === "easy" ? "ゲージが満ちてピッと鳴ったらタップ。" : "音で方向を判断してタップ。空振り後は約0.65秒、攻撃できません。"}命中音のあと、敵の気配が消える。</li>
                     </ol>
-                    <p className="stage-tip">{stage.hint}</p>
+                    <p className="stage-tip">{difficulty === "normal" && stage.id === "mansion" ? "ロックの合図はありません。足音を正面に捉え、自分で攻撃を決めてください。鋭い唸り声は攻撃の前触れ。" : stage.hint}</p>
                     <div className="foyer-checks">
                         <button className="connection-button" type="button" onClick={() => { void game.prepareAudio(); }} disabled={game.audioStatus === "loading"}>
                             <span>{game.audioStatus === "ready" ? "右側の足音をもう一度聴く" : "音声を接続して足音を聴く"}</span>
@@ -77,7 +73,7 @@ export default function GameScreen({ stage, onFinish, onTitle }: GameScreenProps
                     <AudioSettings settings={game.settings} onChange={game.changeSettings} />
                     <button className="menu-primary" type="button" onClick={game.begin}
                         disabled={game.audioStatus !== "ready" || !game.inputReady}>この向きを正面にして開始</button>
-                    <p className="setup-footnote">3秒の合図のあとに開始します。ライフ {stage.initialLife} ／ {stage.mode === "waves" ? stage.waves.length + "ウェーブ" : (stage.durationMs ?? 0) / 1000 + "秒"}</p>
+                    <p className="setup-footnote">3秒の合図のあとに開始します。ライフ {stage.initialLife} ／ {bossStage ? "ボス1体" : stage.mode === "waves" ? "全" + stage.waves.length + "波" : (stage.durationMs ?? 0) / 1000 + "秒"}</p>
                     {game.message && <p role="status">{game.message}</p>}
                 </div>
             </main>
@@ -86,47 +82,36 @@ export default function GameScreen({ stage, onFinish, onTitle }: GameScreenProps
 
     return (
         <main className="echo-game hunt-screen" data-paused={phase === "paused"} data-feedback={feedback?.kind ?? "none"}
+            data-difficulty={difficulty} data-horror={Boolean(stage.haunting)} data-boss={Boolean(boss)}
             style={stageBackgroundStyle(stage.background)}
             tabIndex={-1} aria-label="ECHO HUNT 探索中">
             <div className="mansion-panorama" aria-hidden="true"
                 style={{ backgroundPositionX: "calc(50% - var(--room-width) * " + (game.roomOriginYaw + game.playerYaw) / 360 + ")" }} />
             <div className="hunt-shade" aria-hidden="true" />
+            {stage.haunting && <div className="horror-mist" aria-hidden="true" />}
+            {game.haunting && phase === "playing" && <div key={game.haunting.id} className="horror-veil" aria-hidden="true"><div className="passing-shadow" /></div>}
 
             <header className="game-hud">
-                <div className="hud-stage"><span className="eyebrow">{stage.mode === "waves" ? "WAVE " + (snapshot.waveIndex + 1) + " / " + snapshot.waveCount : "PRACTICE"}</span><span>{stage.mode === "waves" ? snapshot.waveName : stage.name}</span></div>
+                <div className="hud-stage"><span className="eyebrow">{difficultyRules[difficulty].label} · {bossStage ? "ボス戦" : stage.mode === "waves" ? "第" + (snapshot.waveIndex + 1) + "波 / 全" + snapshot.waveCount + "波" : "練習"}</span><span>{stage.mode === "waves" ? snapshot.waveName : stage.name}</span></div>
                 <button className="pause-button" type="button" onClick={game.pause} aria-label="一時停止" disabled={phase === "paused" || phase === "finished"}>Ⅱ</button>
                 <div className="life-meter" role="img" aria-label={"ライフ " + snapshot.life + " / " + snapshot.maxLife} data-invincible={snapshot.invincibleMs > 0}>
-                    <span className="hud-label">LIFE</span>
+                    <span className="hud-label">ライフ</span>
                     <span className="life-symbols" aria-hidden="true">{Array.from({ length: snapshot.maxLife }, (_, index) => <span key={index} className={index < snapshot.life ? "life is-alive" : "life"}>◆</span>)}</span>
                 </div>
-                <div className="hud-score"><span className="hud-label">SCORE</span><strong>{snapshot.score.toLocaleString()}</strong></div>
-                <div className="hud-progress"><span className="hud-label">{snapshot.remainingMs !== null ? "TIME" : "DEFEATED"}</span><strong>{snapshot.remainingMs !== null ? Math.ceil(snapshot.remainingMs / 1000) + "s" : snapshot.defeated}</strong></div>
+                <div className="hud-score"><span className="hud-label">得点</span><strong>{snapshot.score.toLocaleString()}</strong></div>
+                <div className="hud-progress"><span className="hud-label">{snapshot.remainingMs !== null ? "残り時間" : "撃破"}</span><strong>{snapshot.remainingMs !== null ? Math.ceil(snapshot.remainingMs / 1000) + "秒" : snapshot.defeated}</strong></div>
             </header>
+            {boss && phase !== "paused" && <div className="boss-status" role="img" aria-label={`${enemyDefinitions[boss.kind].name} 体力 ${boss.health} / ${boss.maxHealth}`}>
+                <span>{enemyDefinitions[boss.kind].name}</span><span className="boss-health" aria-hidden="true">{Array.from({ length: boss.maxHealth }, (_, index) => <i key={index} className={index < boss.health ? "is-alive" : ""} />)}</span>
+            </div>}
 
-            {phase !== "paused" && (
-                <>
-                    <button type="button" className="attack-surface" disabled={!canAttack} onClick={game.attack} aria-label="撃破する"><span className="sr-only">ロックオンした敵を撃破する</span></button>
-                    <div className={"hunt-focus " + (canAttack ? "is-locked " : "") + (feedback?.kind === "kill" ? "is-victorious" : "")}>
-                        <div className="reticle" aria-hidden="true">
-                            <svg viewBox="0 0 100 100"><circle className="reticle-track" cx="50" cy="50" r="40" /><circle className="reticle-progress" cx="50" cy="50" r="40" pathLength="100" strokeDasharray="100" strokeDashoffset={100 - progress * 100} /></svg>
-                            <span className="reticle-center">{phase === "countdown" ? game.countdown : feedback?.kind === "kill" ? "✦" : "+"}</span>
-                            {feedback?.kind === "kill" && <div className="defeat-burst" key={feedback.id}>{Array.from({ length: 10 }, (_, index) => <i key={index} style={{ "--ray": index * 36 + "deg" } as CSSProperties} />)}</div>}
-                        </div>
-                        <p className="hunt-focus-title">{titleText}</p>
-                        <p className="hunt-focus-caption">{phase === "countdown" ? "スマホを正面に持ってください" : phase === "finished" ? "探索終了" : "LISTEN · TURN · STRIKE"}</p>
-                    </div>
-                    <div className="combat-feedback" role="status" aria-live="polite" aria-atomic="true">
-                        {feedback && <div key={feedback.id} className={"feedback-notice feedback-" + feedback.kind}><strong>{feedback.title}</strong><span>{feedback.detail}</span></div>}
-                    </div>
-                    {snapshot.combo >= 2 && phase === "playing" && <p className="combo-counter">{snapshot.combo}<span>CHAIN</span></p>}
-                    {feedback?.kind === "damage" && <div key={feedback.id} className="damage-vignette" aria-hidden="true" />}
-                </>
-            )}
+            {phase !== "paused" && <CombatOverlay snapshot={snapshot} phase={phase} playerYaw={game.playerYaw}
+                countdown={game.countdown} feedback={feedback} onAttack={game.attack} />}
 
             {phase === "paused" && (
                 <section className="pause-panel" aria-labelledby="pause-title">
-                    <p className="eyebrow">TAKE A BREATH</p><h1 id="pause-title">一時停止中</h1>
-                    <p className="pause-hint">音も、敵も、時間も止まっています。</p>
+                    <h1 id="pause-title">一時停止中</h1>
+                    <p className="pause-hint">敵と時間の進行を止めています。</p>
                     {game.message && <p className="pause-message" role="status">{game.message}</p>}
                     {(game.audioStatus === "error" || game.audioStatus === "idle") && <button type="button" className="connection-button" onClick={() => { void game.prepareAudio(); }}><span>音声を再接続</span></button>}
                     {!game.inputReady && inputControls}
@@ -146,7 +131,8 @@ export default function GameScreen({ stage, onFinish, onTitle }: GameScreenProps
             )}
 
             {isDebug && <details className="debug-panel"><summary>開発用・敵の状態</summary><p>経過 {(snapshot.elapsedMs / 1000).toFixed(1)}秒 ／ 対象 {snapshot.targetId ?? "なし"}</p>
-                {snapshot.enemies.map((enemy) => <p key={enemy.id}>{enemy.id}・{enemyDefinitions[enemy.kind].name}：{enemy.worldYaw.toFixed(1)}° / 距離{enemy.distance.toFixed(2)} / {enemy.phase} / {Math.round(enemy.capture.progressMs)}ms</p>)}
+                {snapshot.phantoms.map((phantom) => <p key={phantom.id}>開発用フェイク：{phantom.worldYaw.toFixed(1)}° / 距離{phantom.distance}</p>)}
+                {snapshot.enemies.map((enemy) => <p key={enemy.id}>{enemy.id}・{enemyDefinitions[enemy.kind].name}：{enemy.worldYaw.toFixed(1)}° / 距離{enemy.distance.toFixed(2)} / {enemy.phase} / 体力{enemy.health}/{enemy.maxHealth} / {Math.round(enemy.capture.progressMs)}ms</p>)}
             </details>}
         </main>
     );

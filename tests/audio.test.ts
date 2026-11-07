@@ -1,6 +1,7 @@
 import test, { beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { SpatialAudio } from "../src/audio/SpatialAudioEngine.ts";
+import { cueKinds } from "../src/audio/cues.ts";
 
 class FakeNode {
     gain = { value: 0 };
@@ -120,7 +121,7 @@ test("一時停止後もデコード済み音源を保持し、再開時に再�
 test("すべての合成SEは有限値で、開始・終了にクリックノイズ用の余白を持つ", async () => {
     const audio = new SpatialAudio();
     await audio.preload([]);
-    for (const kind of ["strike", "collapse", "warning", "damage", "wave", "clear", "game-over", "countdown"] as const) {
+    for (const kind of cueKinds) {
         audio.playCue(kind, kind);
         const source = FakeContext.instances[0].sources.at(-1)!;
         const buffer = source.buffer as { getChannelData: (channel: number) => Float32Array };

@@ -1,9 +1,11 @@
-import type { GameResult } from "./types.ts";
+import type { GameDifficulty, GameResult } from "./types.ts";
 
 export interface GameSettings { volume: number; haptics: boolean }
 export interface StageRecord { score: number; cleared: boolean }
 const settingsKey = "echo-hunt:settings:v1";
-const recordKey = (id: string): string => `echo-hunt:record:v1:${id}`;
+// EASYは従来のキーを使い、すでに保存された記録をそのまま引き継ぐ。
+const recordKey = (id: string, difficulty: GameDifficulty): string =>
+    difficulty === "normal" ? `echo-hunt:record:v1:${id}:normal` : `echo-hunt:record:v1:${id}`;
 
 function read(key: string): unknown {
     try { return JSON.parse(localStorage.getItem(key) ?? "null"); } catch { return null; }
@@ -21,8 +23,8 @@ export function loadSettings(): GameSettings {
 }
 export function saveSettings(settings: GameSettings): void { write(settingsKey, settings); }
 
-export function getRecord(stageId: string): StageRecord {
-    const value = read(recordKey(stageId)) as Partial<StageRecord> | null;
+export function getRecord(stageId: string, difficulty: GameDifficulty = "easy"): StageRecord {
+    const value = read(recordKey(stageId, difficulty)) as Partial<StageRecord> | null;
     return {
         score: typeof value?.score === "number" && Number.isFinite(value.score) ? Math.max(0, value.score) : 0,
         cleared: value?.cleared === true,
@@ -30,8 +32,8 @@ export function getRecord(stageId: string): StageRecord {
 }
 
 export function saveResult(result: GameResult): { bestScore: number; isNewRecord: boolean } {
-    const previous = getRecord(result.stageId);
+    const previous = getRecord(result.stageId, result.difficulty);
     const score = Math.max(previous.score, result.score);
-    write(recordKey(result.stageId), { score, cleared: previous.cleared || result.reason === "cleared" });
+    write(recordKey(result.stageId, result.difficulty), { score, cleared: previous.cleared || result.reason === "cleared" });
     return { bestScore: score, isNewRecord: result.score > previous.score };
 }
