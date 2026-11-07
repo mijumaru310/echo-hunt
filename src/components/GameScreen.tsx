@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useEffectEvent } from "react";
 import type { Enemy, EnemyMode, FinishReason } from "../game/types.ts";
 import { relativeAngle, isInCaptureRange,captureTimeMs, updateCapture, tryCapture } from "../game/capture.ts";
 import type { CaptureState } from "../game/capture.ts";
-import { createEnemyForMode, updateEnemyPosition, recenterEnemy, contactDistance, enemyModeLabels, timeToContactMs } from "../game/EnemyManager.ts";
+import { createEnemyForMode, updateEnemyPosition, recenterEnemy, contactDistance, timeToContactMs } from "../game/EnemyManager.ts";
 import { SpatialAudio } from "../audio/SpatialAudioEngine.ts";
 import { OrientationController } from "../sensors/OrientationController.ts";
 import type { OrientationData } from "../sensors/OrientationController.ts";
@@ -101,8 +101,6 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
         gameMessage = "音声を再生できませんでした。音声を再生し直してください。";
     } else if (audioStatus === "loading") {
         gameMessage = "音声を準備しています。";
-    } else if (canStart) {
-        gameMessage = "正面にしたい方向を向いて開始してください。";
     } else if (hasStarted && !isInputReady) {
         gameMessage = "方向入力の準備を待っています。";
     }
@@ -566,55 +564,79 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
         };
     }, [captureNotice]);
 
+    const debugPanel = isDebug && (
+        <section className="debug-panel" aria-label="PC確認用">
+            <p>開発用：{enemy.id} ／ 敵の方向：{enemy.worldYaw.toFixed(1)}° ／ 移動速度：{enemy.angularVelocity}°/秒</p>
+            <label htmlFor="player-yaw">開発用のプレイヤー方向：{playerYaw}°</label>
+            <input
+                id="player-yaw"
+                type="range"
+                min={-180}
+                max={180}
+                step={1}
+                value={playerYaw}
+                onChange={changePlayerYaw}
+                disabled={isFinished}
+            />
+            <section className={canCapture ? "lockon-panel is-locked" : "lockon-panel"} aria-label="ロックオン">
+                <div className="lockon-heading">
+                    <span>ロックオン</span>
+                    <strong>{lockOnPercent}%</strong>
+                </div>
+                <progress aria-label="ロックオンゲージ" value={enemy.capture.progressMs} max={captureTimeMs} />
+            </section>
+            <p>{inRange ? "捕捉範囲内" : "捕捉範囲外"}</p>
+            <a href="?page=audio">音響テスト画面に戻る</a>
+        </section>
+    );
+
+    if (!hasStarted) {
+        return (
+            <main className="echo-game foyer" aria-label="プレイ準備">
+                <div className="foyer-controls">
+                    <header>
+                        <p>イヤホンをつけて、足音を確かめてください。</p>
+                    </header>
+                    <div className="foyer-checks">
+                        <button type="button" onClick={(): void => { void startAudio(enemy); }}
+                            disabled={audioStatus === "loading"}>
+                            <span>{audioStatus === "ready" ? "足音をもう一度聴く" : "足音を聴く"}</span>
+                            <small aria-live="polite">{audioStatus === "ready" ? "再生中" : audioStatus === "loading" ? "読込中" : ""}</small>
+                        </button>
+                        {audioStatus === "error" && <p role="alert">音声を再生できませんでした。「足音を聴く」で再試行してください。</p>}
+                        <button type="button" onClick={(): void => { void startSensor(); }} disabled={inputStatus !== "pc"}>
+                            <span>センサー開始</span>
+                            <small aria-live="polite">{inputLabel}</small>
+                        </button>
+                        {sensorError && <p role="alert">{sensorError}</p>}
+                    </div>
+                    <button className="foyer-enter" type="button" onClick={beginGame} disabled={!canStart}>
+                        この向きを正面にして開始
+                    </button>
+                    {recenterMessage && <p role="alert">{recenterMessage}</p>}
+                    {isDebug && <details className="foyer-debug"><summary>PCの方向を調整</summary>{debugPanel}</details>}
+                </div>
+            </main>
+        );
+    }
+
     return (
-        <main className={isDebug ? "echo-game" : "echo-game ear-play"} data-playing={hasStarted} aria-label="ECHO HUNT">
+        <main className={isDebug ? "echo-game" : "echo-game ear-play"} data-playing={hasStarted} data-paused={isPaused} aria-label="ECHO HUNT">
             {hasStarted && (
                 <div className="mansion-panorama" aria-hidden="true"
                     style={{ backgroundPositionX: `calc(50% - var(--room-width) * ${(roomOriginYaw + playerYaw) / 360})` }}
                 />
             )}
-            {!hasStarted && (
-                <header className="game-heading">
-                    <h1>プレイ準備</h1>
-                    <p className="screen-note">敵の種類：{enemyModeLabels[enemyMode]}</p>
-                </header>
-            )}
-
-            {(!hasStarted || (!isPaused && (isDebug || audioStatus === "error"))) && (
-                <section className="preparation-panel" aria-label="プレイ準備">
+            {!isPaused && (isDebug || audioStatus === "error") && (
+                <section className="preparation-panel" aria-label="入力と音声">
                     <div className="preparation-actions">
-                        <button
-                            type="button"
-                            onClick={(): void => { void startAudio(enemy); }}
-                            disabled={isFinished || audioStatus === "loading"}
-                        >
-                            音声を再生
-                        </button>
-                        <button
-                            type="button"
-                            onClick={(): void => { void startSensor(); }}
-                            disabled={isFinished || inputStatus !== "pc"}
-                        >
-                            センサー開始
-                        </button>
-                        {!hasStarted && (
-                            <button className="primary-button game-start" type="button" onClick={beginGame} disabled={!canStart}>
-                                この向きを正面にして開始
-                            </button>
-                        )}
+                        <button type="button" onClick={(): void => { void startAudio(enemy); }}
+                            disabled={isFinished || audioStatus === "loading"}>音声を再生</button>
+                        <button type="button" onClick={(): void => { void startSensor(); }}
+                            disabled={isFinished || inputStatus !== "pc"}>センサー開始</button>
                     </div>
                     <p className="screen-note">入力：{inputLabel}</p>
                     {sensorError && <p role="alert">{sensorError}</p>}
-                    {!hasStarted && (
-                        <>
-                            {recenterMessage && <p role="alert">{recenterMessage}</p>}
-                            <p className="screen-note">
-                                {isDebug
-                                    ? "音声を再生し、スライダーで開始時の向きを選んでください。"
-                                    : "音声を再生し、センサーの利用を許可してください。"}
-                            </p>
-                        </>
-                    )}
                 </section>
             )}
 
@@ -634,19 +656,19 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
             </div>
 
             {isPaused && !isFinished && (
-                <section className="pause-panel" aria-label="一時停止操作">
-                    <h3>一時停止中</h3>
-                    <p className="screen-note">時間・敵の移動・ロックオン・音を停止しています。</p>
+                <section className="pause-panel" aria-labelledby="pause-title">
+                    <h2 id="pause-title">一時停止中</h2>
                     <div className="pause-actions">
-                        <button className="primary-button" type="button" onClick={(): void => { void resumeGame(); }}
+                        <button className="pause-resume" type="button" onClick={(): void => { void resumeGame(); }}
                             disabled={audioStatus === "loading" || !isInputReady}>
                             再開
                         </button>
-                        <button type="button" onClick={recenterPlayer} disabled={audioStatus === "loading"}>
+                        <button className="pause-recenter" type="button" onClick={recenterPlayer} disabled={audioStatus === "loading"}>
                             今の向きを正面に設定
                         </button>
                     </div>
                     <p className="screen-note" role="status">{recenterMessage}</p>
+                    {gameMessage && <p role="status">{gameMessage}</p>}
                 </section>
             )}
 
@@ -667,33 +689,11 @@ export default function GameScreen({ onFinish, enemyMode }: GameScreenProps): Re
             >
                 {isDebug && captureLabel}
             </button>
-            {gameMessage && <p className="game-status">{gameMessage}</p>}
+            {!isPaused && gameMessage && <p className="game-status">{gameMessage}</p>}
 
-            {isDebug && (
-                <section className="debug-panel" aria-label="PC確認用">
-                    <p>開発用：{enemy.id} ／ 敵の方向：{enemy.worldYaw.toFixed(1)}° ／ 移動速度：{enemy.angularVelocity}°/秒</p>
-                    <label htmlFor="player-yaw">開発用のプレイヤー方向：{playerYaw}°</label>
-                    <input
-                        id="player-yaw"
-                        type="range"
-                        min={-180}
-                        max={180}
-                        step={1}
-                        value={playerYaw}
-                        onChange={changePlayerYaw}
-                        disabled={isFinished}
-                    />
-                    <section className={canCapture ? "lockon-panel is-locked" : "lockon-panel"} aria-label="ロックオン">
-                        <div className="lockon-heading">
-                            <span>ロックオン</span>
-                            <strong>{lockOnPercent}%</strong>
-                        </div>
-                        <progress aria-label="ロックオンゲージ" value={enemy.capture.progressMs} max={captureTimeMs} />
-                    </section>
-                    <p>{inRange ? "捕捉範囲内" : "捕捉範囲外"}</p>
-                    <a href="?page=audio">音響テスト画面に戻る</a>
-                </section>
-            )}
+            {isPaused && isDebug
+                ? <details className="pause-debug"><summary>PCの方向を調整</summary>{debugPanel}</details>
+                : debugPanel}
         </main>
     );
 }
