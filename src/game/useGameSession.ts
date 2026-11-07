@@ -2,14 +2,16 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { GameEngine } from "./GameEngine.ts";
 import { GameAudio } from "../audio/GameAudio.ts";
 import { OrientationController } from "../sensors/OrientationController.ts";
+import { enemyDefinitions } from "./enemies.ts";
 import { loadSettings, saveSettings } from "./storage.ts";
 import type { GameSettings } from "./storage.ts";
-import type { GameEvent, GameResult, StageDefinition } from "./types.ts";
+import type { GameDifficulty, GameEvent, GameResult, HauntingKind, StageDefinition } from "./types.ts";
 
 type Phase = "setup" | "countdown" | "playing" | "paused" | "finished";
 type InputStatus = "idle" | "permission" | "waiting" | "sensor" | "pc" | "error";
 type AudioStatus = "idle" | "loading" | "ready" | "error";
-export interface Feedback { id: number; kind: "kill" | "damage" | "wave"; title: string; detail: string; until: number }
+export interface Feedback { id: number; kind: "kill" | "damage" | "wave" | "miss" | "hit" | "blocked" | "boss"; title: string; detail: string; until: number }
+export interface HauntingNotice { id: number; kind: HauntingKind; until: number }
 
 function sensorMessage(error: unknown): string {
     if (!window.isSecureContext) return "スマホのセンサーにはHTTPSのURLが必要です。PC操作でも試せます。";
@@ -21,8 +23,8 @@ function sensorMessage(error: unknown): string {
 }
 
 /** リアルタイム処理はref、表示だけ約30fps。音源位置はセンサーから直接更新。 */
-export function useGameSession(stage: StageDefinition, onFinish: (result: GameResult) => void) {
-    const [engine] = useState(() => new GameEngine(stage));
+export function useGameSession(stage: StageDefinition, difficulty: GameDifficulty, onFinish: (result: GameResult) => void) {
+    const [engine] = useState(() => new GameEngine(stage, Math.random, difficulty));
     const [snapshot, setSnapshot] = useState(() => engine.snapshot());
     const [phase, setPhaseState] = useState<Phase>("setup");
     const phaseRef = useRef<Phase>("setup");
@@ -38,6 +40,8 @@ export function useGameSession(stage: StageDefinition, onFinish: (result: GameRe
     const [roomOriginYaw, setRoomOriginYaw] = useState(0);
     const [feedback, setFeedback] = useState<Feedback | null>(null);
     const feedbackRef = useRef<Feedback | null>(null);
+    const [haunting, setHaunting] = useState<HauntingNotice | null>(null);
+    const hauntingRef = useRef<HauntingNotice | null>(null);
     const noticeSequence = useRef(0);
     const [settings, setSettings] = useState<GameSettings>(loadSettings);
     const settingsRef = useRef(settings);
@@ -86,13 +90,32 @@ export function useGameSession(stage: StageDefinition, onFinish: (result: GameRe
         audioRef.current?.handle(events, playerYawRef.current);
         for (const event of events) {
             if (event.type === "enemy-defeated") {
-                showFeedback("kill", "撃破", `+${event.points}  /  ${event.combo} CHAIN`, 800);
+                hauntingRef.current = null;
+                setHaunting(null);
+                showFeedback("kill", "撃破", `+${event.points}点  /  ${event.combo}連続`, 800);
                 vibrate([35, 25, 65]);
             } else if (event.type === "player-damaged") {
                 showFeedback("damage", "襲撃を受けた", `ライフ 残り${event.life}`, 1000);
                 vibrate([100, 60, 100]);
+            } else if (event.type === "attack-missed") {
+                showFeedback("miss", "空振り", "構え直し中", 650);
+                vibrate(15);
+            } else if (event.type === "attack-blocked") {
+                showFeedback("blocked", "弾かれた", "鍵の音が止まるのを待つ", 650);
+                vibrate(20);
+            } else if (event.type === "enemy-hit") {
+                hauntingRef.current = null;
+                setHaunting(null);
+                showFeedback("hit", "命中", `残り${event.enemy.health}回  /  +${event.points}点`, 850);
+                vibrate([35, 25, 35]);
+            } else if (event.type === "spawned" && enemyDefinitions[event.enemy.kind].boss) {
+                showFeedback("boss", enemyDefinitions[event.enemy.kind].name, "息を吸う音を待つ", 2400);
+            } else if (event.type === "haunting") {
+                const next = { id: ++noticeSequence.current, kind: event.kind, until: performance.now() + 2200 };
+                hauntingRef.current = next;
+                setHaunting(next);
             } else if (event.type === "wave-started") {
-                showFeedback("wave", stage.mode === "waves" ? `WAVE ${event.index + 1}` : "LISTEN", event.name, 2000);
+                showFeedback("wave", stage.mode === "waves" ? `第${event.index + 1}波` : "練習開始", event.name, 2000);
             } else if (event.type === "finished") {
                 setPhase("finished");
                 finishAtMs.current = performance.now();
@@ -267,10 +290,9 @@ export function useGameSession(stage: StageDefinition, onFinish: (result: GameRe
         const now = performance.now();
         if (now - lastTickMs.current > 1500) { pause("処理が中断されたため一時停止しました。", false); return; }
         advance(now);
-        if (engine.attack(playerYawRef.current)) {
-            consumeEvents();
-            audioRef.current?.sync(engine.snapshot(), playerYawRef.current);
-        }
+        engine.attack(playerYawRef.current);
+        consumeEvents();
+        audioRef.current?.sync(engine.snapshot(), playerYawRef.current);
         publish();
     }
 
@@ -324,6 +346,10 @@ export function useGameSession(stage: StageDefinition, onFinish: (result: GameRe
             if (feedbackRef.current && now >= feedbackRef.current.until) {
                 feedbackRef.current = null;
                 setFeedback(null);
+            }
+            if (hauntingRef.current && now >= hauntingRef.current.until) {
+                hauntingRef.current = null;
+                setHaunting(null);
             }
             if (phaseRef.current === "finished" && finishAtMs.current !== null
                 && now - finishAtMs.current >= 1500 && !finishDelivered.current) {
@@ -394,7 +420,7 @@ export function useGameSession(stage: StageDefinition, onFinish: (result: GameRe
     }, [engine, stage]);
 
     return {
-        snapshot, phase, countdown, inputStatus, audioStatus, sensorError, message, feedback,
+        snapshot, phase, countdown, inputStatus, audioStatus, sensorError, message, feedback, haunting,
         playerYaw, roomOriginYaw, settings, changeSettings, changeYaw, usePc, startSensor,
         prepareAudio, begin, resume, pause: (): void => pause(), recenter, attack,
         inputReady: inputStatus === "pc" || inputStatus === "sensor",

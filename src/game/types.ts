@@ -2,6 +2,7 @@ import type { CaptureState } from "./capture.ts";
 
 export type EnemyMode = "stationary" | "moving" | "approaching";
 export type FinishReason = "time" | "cleared" | "defeated";
+export type GameDifficulty = "easy" | "normal";
 
 export interface Enemy {
     worldYaw: number;
@@ -12,8 +13,8 @@ export interface Enemy {
     capture: CaptureState;
 }
 
-export type EnemyKind = "walker" | "runner" | "orbiter";
-export type EnemyPhase = "approaching" | "winding-up" | "defeated" | "retreating";
+export type EnemyKind = "walker" | "runner" | "orbiter" | "lurker" | "warden";
+export type EnemyPhase = "approaching" | "hiding" | "winding-up" | "defeated" | "retreating" | "guarding" | "exposed" | "recovering";
 
 export interface EnemyDefinition {
     name: string;
@@ -28,6 +29,8 @@ export interface EnemyDefinition {
     soundUrl: string;
     playbackRate: number;
     volume: number;
+    concealment?: { moveMs: number; hideMs: number; breathMs: number; breathUrl: string };
+    boss?: { health: number; guardMs: number; exposedMs: number; recoveryMs: number };
 }
 
 export interface CombatEnemy extends Enemy {
@@ -36,7 +39,20 @@ export interface CombatEnemy extends Enemy {
     phaseRemainingMs: number;
     approachSpeed: number;
     lockTimeMs: number;
+    behaviorRemainingMs: number;
+    health: number;
+    maxHealth: number;
 }
+
+export interface Phantom {
+    id: string;
+    worldYaw: number;
+    distance: number;
+    bornAtMs: number;
+    remainingMs: number;
+}
+
+export type HauntingKind = "knock" | "whisper" | "door";
 
 export interface SpawnDefinition {
     kind: EnemyKind;
@@ -69,11 +85,13 @@ export interface StageDefinition {
     /** "mansion" は既存パノラマ。ほかは public 配下などの画像URL。 */
     background: string;
     ambientSoundUrl?: string;
+    haunting?: { fakeIntervalMs: number; fakeLifetimeMs: number; atmosphereIntervalMs: number };
 }
 
 export type GameStatus = "ready" | "playing" | "paused" | "finished";
 
 export interface GameResult {
+    difficulty: GameDifficulty;
     stageId: string;
     stageName: string;
     reason: FinishReason;
@@ -86,9 +104,13 @@ export interface GameResult {
     elapsedMs: number;
     wavesCleared: number;
     waveCount: number;
+    shots: number;
+    misses: number;
 }
 
 export interface GameSnapshot {
+    difficulty: GameDifficulty;
+    ending: boolean;
     status: GameStatus;
     elapsedMs: number;
     remainingMs: number | null;
@@ -107,11 +129,20 @@ export interface GameSnapshot {
     targetId: string | null;
     enemies: readonly CombatEnemy[];
     result: GameResult | null;
+    attackRecoveryMs: number;
+    shots: number;
+    misses: number;
+    phantoms: readonly Phantom[];
 }
 
 export type GameEvent =
     | { type: "spawned"; enemy: CombatEnemy }
     | { type: "lock-ready"; enemyId: string }
+    | { type: "attack-missed" }
+    | { type: "attack-blocked"; enemy: CombatEnemy }
+    | { type: "boss-opening"; enemy: CombatEnemy }
+    | { type: "enemy-hit"; enemy: CombatEnemy; points: number }
+    | { type: "haunting"; kind: HauntingKind; worldYaw: number; distance: number }
     | { type: "attack-warning"; enemy: CombatEnemy }
     | { type: "enemy-defeated"; enemy: CombatEnemy; points: number; combo: number }
     | { type: "player-damaged"; enemy: CombatEnemy; life: number; damage: number }

@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { GameEngine, invincibilityMs } from "../src/game/GameEngine.ts";
-import { enemyDefinitions } from "../src/game/enemies.ts";
 import { stages, getStage, validateStage } from "../src/game/stages.ts";
 import { relativeAngle } from "../src/game/capture.ts";
 import type { GameEvent, StageDefinition } from "../src/game/types.ts";
@@ -235,7 +234,7 @@ test("見本ステージを開始から9体撃破・3ウェーブ踏破まで通
     assert.equal(result?.wavesCleared, 3);
     assert.equal(events.filter((event) => event.type === "wave-started").length, 3);
     assert.equal(events.filter((event) => event.type === "finished").length, 1);
-    assert.deepEqual(new Set(events.filter((event) => event.type === "spawned").map((event) => event.enemy.kind)), new Set(Object.keys(enemyDefinitions)));
+    assert.deepEqual(new Set(events.filter((event) => event.type === "spawned").map((event) => event.enemy.kind)), new Set(["walker", "runner", "orbiter"]));
 });
 
 test("スナップショットの変更は内部の敵や捕捉状態を変更しない", () => {

@@ -197,3 +197,47 @@
 }
 
 .echo-game .stage-tip { border-left: 1px solid #b7986c88; padding-left: 12px; margin: 0 0 20px; font-size: 12px; color: var(--gold); }
+/* 難易度の違いは表示支援だけでなく、入力判定と記録にも反映する。 */
+.difficulty-selector { margin: 20px 0; padding: 0; border: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.difficulty-selector legend { color: var(--muted); font-size: 11px; padding: 0 0 8px; }
+.difficulty-option { min-height: 60px; padding: 10px 12px; border: 1px solid var(--line); display: flex; align-items: center; gap: 10px; cursor: pointer; background: #10111570; }
+.difficulty-option.is-selected { border-color: #bda171; background: #77603a22; }
+.difficulty-option:focus-within { outline: 2px solid var(--gold); outline-offset: 3px; }
+.difficulty-option input { width: 16px; height: 16px; accent-color: var(--gold); }
+.difficulty-option strong { display: block; font-size: 11px; font-weight: 500; letter-spacing: .14em; color: var(--ink); }
+.difficulty-option small { display: block; font-size: 10px; color: var(--muted); }
+.echo-game .difficulty-selector > p { grid-column: 1 / -1; color: var(--muted); font-size: 11px; line-height: 1.7; min-height: 19px; }
+.enemy-guide .fake-clue { margin-top: 12px; color: #c6b595; }
+.reticle-blind .reticle-center { color: #d3cbbb55; font-size: 23px; }
+.is-victorious .reticle-blind .reticle-center { color: var(--gold); font-size: 46px; }
+.feedback-miss { color: #b8b0a3; }
+.feedback-miss strong { font-size: 18px; }
+.echo-game .accuracy-line { font-size: 11px; color: var(--muted); margin: -8px 0 24px; }
+.hunt-screen[data-horror="true"] .hunt-shade { background: radial-gradient(ellipse at center, #03060c22, #03050bb8 76%), linear-gradient(#04070db8, transparent 36%, #04070dbb); }
+.horror-mist { position: absolute; inset: -12%; z-index: -1; pointer-events: none; opacity: .13; background: radial-gradient(ellipse at 25% 78%, #a8b5bf55, transparent 45%), radial-gradient(ellipse at 90% 25%, #7b889133, transparent 40%); animation: mist-drift 24s ease-in-out infinite alternate; }
+.hunt-screen[data-paused="true"] .horror-mist { animation-play-state: paused; }
+.horror-veil { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; background: #0005; animation: room-darkening 2.2s ease-in-out both; }
+.passing-shadow { position: absolute; right: -4vw; top: 5%; width: clamp(55px, 12vw, 145px); height: 75%; opacity: .5; filter: blur(14px); background: radial-gradient(ellipse at 50% 23%, #000 0 12%, transparent 15%), radial-gradient(ellipse at 50% 70%, #000 0 30%, transparent 55%); animation: shadow-passing 2.2s ease-in-out both; }
+@keyframes mist-drift { from { transform: translateX(-3%); } to { transform: translateX(3%); } }
+@keyframes room-darkening { 0%, 100% { opacity: 0; } 35%, 65% { opacity: .8; } }
+@keyframes shadow-passing { from { transform: translateX(120%); opacity: 0; } 45% { transform: translateX(-10%); opacity: .55; } to { transform: translateX(100%); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+    .horror-mist, .passing-shadow { display: none; }
+    .horror-veil { opacity: .25; }
+}
+/* ボスの体力は向きや隙で変えず、命中した結果だけを示す。 */
+.boss-status { position: relative; z-index: 4; width: min(100%, 1000px); margin: 20px auto 0; display: flex; justify-content: space-between; align-items: center; gap: 20px; padding-top: 12px; border-top: 1px solid #b8a59135; color: #c8b3a1; font: 14px var(--serif); pointer-events: none; }
+.boss-health { display: flex; gap: 7px; }
+.boss-health i { display: block; width: 25px; height: 3px; background: #ffffff1c; }
+.boss-health i.is-alive { background: #c08872; }
+.hunt-screen[data-boss="true"] .hunt-shade { background: radial-gradient(ellipse at center, #0904050d, #080404b8 76%), linear-gradient(#080506bb, transparent 36%, #080406bb); }
+.feedback-hit { color: #dfc29d; }
+.feedback-hit strong, .feedback-boss strong { font-size: 23px; }
+.feedback-blocked { color: #c0b8ad; }
+.feedback-blocked strong { font-size: 18px; }
+.feedback-boss { color: #d3baac; }
+.stage-card-meta, .hud-stage .eyebrow, .hud-label, .difficulty-option strong { letter-spacing: .04em; }
+.stage-card-meta { font-size: 11px; }
+.hud-label { font-size: 10px; }
+.difficulty-option strong { font-size: 13px; }
+.hunt-focus-title { letter-spacing: .08em; }

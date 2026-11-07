@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import type { ReactElement } from "react";
-import type { GameResult } from "../game/types.ts";
+import type { GameDifficulty, GameResult } from "../game/types.ts";
 import { getStage } from "../game/stages.ts";
 import { saveResult } from "../game/storage.ts";
 import TitleScreen from "./TitleScreen.tsx";
@@ -12,6 +12,7 @@ import "./game.css";
 export default function GameApp(): ReactElement {
     const [screen, setScreen] = useState<"title" | "game" | "result">("title");
     const [stageId, setStageId] = useState("mansion");
+    const [difficulty, setDifficulty] = useState<GameDifficulty>("easy");
     const [sessionId, setSessionId] = useState(0);
     const [result, setResult] = useState<SavedResult | null>(null);
     const finishGame = useCallback((next: GameResult): void => {
@@ -19,8 +20,10 @@ export default function GameApp(): ReactElement {
         setScreen("result");
     }, []);
 
-    function startGame(id: string): void { setStageId(id); setSessionId((value) => value + 1); setScreen("game"); }
-    if (screen === "title") return <TitleScreen initialStageId={stageId} onStart={startGame} />;
-    if (screen === "result" && result) return <ResultScreen result={result} onRestart={() => startGame(stageId)} onTitle={() => setScreen("title")} />;
-    return <GameScreen key={sessionId} stage={getStage(stageId)} onFinish={finishGame} onTitle={() => setScreen("title")} />;
+    function startGame(id: string, nextDifficulty: GameDifficulty): void {
+        setStageId(id); setDifficulty(nextDifficulty); setSessionId((value) => value + 1); setScreen("game");
+    }
+    if (screen === "title") return <TitleScreen initialStageId={stageId} initialDifficulty={difficulty} onStart={startGame} />;
+    if (screen === "result" && result) return <ResultScreen result={result} onRestart={() => startGame(stageId, difficulty)} onTitle={() => setScreen("title")} />;
+    return <GameScreen key={sessionId} stage={getStage(stageId)} difficulty={difficulty} onFinish={finishGame} onTitle={() => setScreen("title")} />;
 }
