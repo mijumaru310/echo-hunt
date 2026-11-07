@@ -1,2 +1,2 @@
 export const isDebug: boolean =
-    new URLSearchParams(window.location.search).get("debug") === "1";
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("debug") === "1";

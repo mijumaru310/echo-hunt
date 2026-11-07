@@ -1,32 +1,103 @@
-# React + TypeScript + Vite
+# ECHO HUNT
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+スマートフォンとイヤホンで遊ぶ、立体音響のホラーゲーム。
+見えない敵を音で探し、正面に捉えてロックオンし、タップで撃破します。
 
-Currently, two official plugins are available:
+## 起動する
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Node.js 24以上とnpmを使用します。
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```powershell
+npm ci
+npm run dev -- --host 127.0.0.1 --port 5174
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+PCでは http://127.0.0.1:5174/ を開きます。
+「探索の準備へ」→「音声を接続」→「PCのスライダーで試す」→「開始」で遊べます。
+スライダーで向きを変え、ロックオン完了後に画面をクリック、またはSpaceで撃破します。Escで一時停止します。
+
+スマホの方向センサーを使う場合はHTTPSが必要です。PCのLANアドレスをHTTPで開いただけではセンサーを使えません。
+HTTPSの開発版でイヤホンを装着し、音声とセンサーをそれぞれボタンから接続してください。
+
+## 遊べる内容
+
+- **第一夜・洋館**：ライフ3、3ウェーブ、計9体。通常型・俊敏型・周回型が順に登場します。
+- **練習・静かな気配**：敵は静止。60秒で音の方向を覚えます。
+- **練習・さまよう気配**：敵が周回。接近せず、60秒で追従を練習します。
+- **練習・近づく足音**：約15秒で接近する敵を倒して60秒生存します。
+
+正面±15度を約0.7秒捉えると合図音が鳴ります。タップで1体を撃破します。
+敵が近づくと心音、攻撃直前には唸り声が鳴ります。予告中にも撃破できます。
+攻撃を受けるとライフを1失い、ライフ0で終了します。敵は攻撃後に離脱します。
+第一夜は全ウェーブの終了時にライフが残っていればクリアです。全敵の撃破は必須ではなく、撃破数は得点に反映します。
+
+撃破時は命中音・方向付きの消滅音・画面の衝撃表現・任意の振動で知らせます。
+連続撃破は25点ずつ、1体あたり最大100点の追加ボーナスになります。
+ベストスコアと音量・振動設定は、このブラウザのlocalStorageに保存します。
+
+## 開発者向けの入口
+
+| URL | 用途 |
+|---|---|
+| `/` / `?page=game` | 通常ゲーム |
+| `?debug=1` | 敵の角度・距離・状態を表示して確認 |
+| `?page=audio` | 従来の音響・センサーの検証画面 |
+
+通常画面に敵の位置や方向矢印は表示しません。開発用表示を公開時に常時有効にしないでください。
+
+## 構成
+
+```text
+src/game/
+  GameEngine.ts            # ライフ・敵・捕捉・得点・ウェーブ。React/音声に非依存
+  types.ts                 # チーム共通のデータ型・イベント
+  enemies.ts               # 3種類の敵の速度、音、得点など
+  stages.ts                # ステージ登録と設定検証
+  stages/
+    defaults.ts            # 共通の初期設定
+    mansion.ts             # 見本ステージ
+    practice.ts            # 従来モードを引き継ぐ練習ステージ
+  useGameSession.ts        # 入力・音声・ゲームループ・一時停止の接続
+  storage.ts               # ローカルの記録と設定
+src/audio/
+  SpatialAudioEngine.ts    # 低遅延の音源管理。従来APIも維持
+  GameAudio.ts             # 戦闘イベントを音に変換
+  cues.ts                  # オリジナルの合成効果音
+src/sensors/               # 既存の姿勢計算と方向コントローラー
+src/components/            # タイトル・準備・ゲーム・リザルトと表示
+```
+
+`EnemyManager.ts` と `capture.ts` の従来APIは既存コード・テスト向けに残しています。
+新しい戦闘の調整先は `GameEngine.ts` と `enemies.ts` です。
+
+## メンバーと共有する
+
+- [戦闘仕様・ステージ追加・担当範囲](docs/COMBAT_DESIGN.md)
+- [スマホ実機での確認手順](docs/PLAYTEST.md)
+
+新しいステージは `src/game/stages/` 内に担当者ごとのファイルで作成し、`src/game/stages.ts` に登録します。
+背景・環境音・出現順・間隔・同時出現数を設定できます。戦闘コードをコピーする必要はありません。
+
+## 検証する
+
+```powershell
+npm test
+npm run lint
+npm run build
+```
+
+テストはNode標準のテストランナーを使用し、描画スモークテストには既存のViteとReactを使用します。
+外部のテストサービスや追加のnpm依存はありません。
+自動テストでは、イヤホンの定位やスマホの権限ダイアログ、実際の振動までは確認できません。
+
+## Cloud Runへ反映する場合
+
+既存のDockerfileはNode 24でビルドし、Nginxの8080番で配信します。
+ローカルの変更を公開する際は、内容を確認してから既存の開発サービスへデプロイします。
+
+```powershell
+npm run build
+gcloud run deploy echo-hunt-dev --source . --region asia-northeast1 --allow-unauthenticated --port 8080 --min-instances 0
+```
+
+今回のコード変更だけではCloud Runの内容は更新されません。

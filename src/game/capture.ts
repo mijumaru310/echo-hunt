@@ -32,7 +32,7 @@ export function updateCapture(
         return state;
     }
 
-    const elapsedMs: number = Math.max(0, dtMs);
+    const elapsedMs: number = Number.isFinite(dtMs) ? Math.max(0, dtMs) : 0;
     let progressMs: number = state.progressMs;
 
     if (isInCaptureRange(relAngle)) {
