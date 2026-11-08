@@ -4,7 +4,6 @@ import { relativeAngle } from "../game/capture.ts";
 import { attackDistance } from "../game/GameEngine.ts";
 import { getEnemyVoice, isActiveEnemy, phantomPulse } from "../game/enemyBehavior.ts";
 import type { CombatEnemy, GameEvent, GameSnapshot, StageDefinition } from "../game/types.ts";
-import lockReadySound from "../assets/lock-ready.wav";
 import heartbeatSound from "../assets/heartbeat.wav";
 
 /** ゲームのイベントを音に翻訳する。敵の判定・得点・時間には触れない。 */
@@ -38,7 +37,7 @@ export class GameAudio {
                 return [definition.soundUrl, ...(definition.concealment ? [definition.concealment.breathUrl] : [])];
             })),
             "/sounds/footstep.wav",
-            lockReadySound, heartbeatSound, ...(stage.ambientSoundUrl ? [stage.ambientSoundUrl] : []),
+            heartbeatSound, ...(stage.ambientSoundUrl ? [stage.ambientSoundUrl] : []),
         ]);
     }
 
@@ -177,7 +176,7 @@ export class GameAudio {
                 case "spawned":
                     if (enemyDefinitions[event.enemy.kind].boss) this.engine.playCue(`arrival-${++this.sequence}`, "door", { spatial: false, volume: 0.65 });
                     break; // 足音は sync() が開始する。
-                case "lock-ready": this.playFile("lock-ready", lockReadySound, 0.35); break;
+                case "lock-ready": this.engine.playCue("lock-ready", "lock-ready", { spatial: false, volume: 0.4 }); break;
                 case "attack-missed":
                     this.engine.playCue(`miss-${++this.sequence}`, "miss", { spatial: false, volume: 0.65 });
                     break;

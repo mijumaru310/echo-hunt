@@ -1,6 +1,6 @@
 import test, { beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { getRecord, loadSettings, saveResult } from "../src/game/storage.ts";
+import { getRecord, loadSettings, saveResult, saveSettings } from "../src/game/storage.ts";
 import type { GameResult } from "../src/game/types.ts";
 
 const globals = globalThis as unknown as Record<string, unknown>;
@@ -29,8 +29,15 @@ test("ステージ別ベストスコアは低い得点で上書きされず、�
 
 test("保存データが壊れている・保存が禁止されている場合もプレイを妨げない", () => {
     values.set("echo-hunt:settings:v1", "broken-json");
-    assert.deepEqual(loadSettings(), { volume: 0.7, haptics: true });
+    assert.deepEqual(loadSettings(), { volume: 0.7, haptics: true, music: true });
     globals.localStorage = { getItem: () => { throw new Error("denied"); }, setItem: () => { throw new Error("denied"); } };
     assert.deepEqual(getRecord("mansion"), { score: 0, cleared: false });
     assert.doesNotThrow(() => saveResult({ stageId: "mansion", score: 100, reason: "cleared" } as GameResult));
+});
+
+test("以前の音量設定を保ち、BGMのオン・オフを保存する", () => {
+    values.set("echo-hunt:settings:v1", JSON.stringify({ volume: 0.35, haptics: false }));
+    assert.deepEqual(loadSettings(), { volume: 0.35, haptics: false, music: true });
+    saveSettings({ ...loadSettings(), music: false });
+    assert.deepEqual(loadSettings(), { volume: 0.35, haptics: false, music: false });
 });

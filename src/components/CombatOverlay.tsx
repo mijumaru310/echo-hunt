@@ -27,6 +27,7 @@ export default function CombatOverlay({ snapshot, phase, playerYaw, countdown, f
                 </div>}
             </div>
             {view.title && <p className="hunt-focus-title">{view.title}</p>}
+            {view.locked && <p className="hunt-focus-caption">画面のどこでもタップ</p>}
             {phase === "countdown" && <p className="hunt-focus-caption">スマホを正面に持ってください</p>}
         </div>
         <div className="combat-feedback" role="status" aria-live="polite" aria-atomic="true">

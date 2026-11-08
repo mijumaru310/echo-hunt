@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import type { GameResult } from "../game/types.ts";
 import { getStage } from "../game/stages.ts";
 import { stageBackgroundStyle } from "./stagePresentation.ts";
@@ -7,8 +7,9 @@ import { enemyDefinitions } from "../game/enemies.ts";
 
 export interface SavedResult extends GameResult { bestScore: number; isNewRecord: boolean }
 
-export default function ResultScreen({ result, onRestart, onTitle, onNextStage }: {
+export default function ResultScreen({ result, onRestart, onTitle, onNextStage, musicControl }: {
     result: SavedResult; onRestart: () => void; onTitle: () => void; onNextStage?: () => void;
+    musicControl?: ReactNode;
 }): ReactElement {
     const success = result.reason !== "defeated";
     const canContinue: boolean = result.reason === "cleared" && onNextStage !== undefined;
@@ -16,6 +17,7 @@ export default function ResultScreen({ result, onRestart, onTitle, onNextStage }
     const bossStage = stage.waves.some((wave) => wave.enemies.some((spawn) => enemyDefinitions[spawn.kind].boss));
     return (
         <main className="echo-game echo-result mansion-menu" style={stageBackgroundStyle(stage.background)} data-success={success} aria-label="探索結果">
+            {musicControl}
             <div className="menu-controls result-content">
                 <header className="result-heading">
                     <h1>{result.reason === "cleared" ? "クリア" : result.reason === "time" ? "練習終了" : "ゲームオーバー"}</h1>
