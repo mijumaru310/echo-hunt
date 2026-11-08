@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactElement } from "react";
 import { combatPresentation } from "../game/combatPresentation.ts";
+import { difficultyRules } from "../game/difficulty.ts";
 import type { CombatPhase } from "../game/combatPresentation.ts";
 import type { GameSnapshot } from "../game/types.ts";
 import type { Feedback } from "../game/useGameSession.ts";
@@ -9,6 +10,7 @@ export default function CombatOverlay({ snapshot, phase, playerYaw, countdown, f
     feedback: Feedback | null; onAttack: () => void;
 }): ReactElement {
     const view = combatPresentation(snapshot, phase, playerYaw);
+    const recoveryFraction: number = Math.min(1, snapshot.attackRecoveryMs / Math.max(1, difficultyRules[snapshot.difficulty].missRecoveryMs));
     return <>
         <button type="button" className="attack-surface" disabled={!view.canAttack} onClick={onAttack} aria-label="正面に攻撃する">
             <span className="sr-only">正面に攻撃する</span>
@@ -32,6 +34,9 @@ export default function CombatOverlay({ snapshot, phase, playerYaw, countdown, f
                 <strong>{feedback.title}</strong><span>{feedback.detail}</span>
             </div>}
         </div>
+        {phase === "playing" && snapshot.attackRecoveryMs > 0 && <div className="attack-recovery" aria-hidden="true">
+            <span style={{ transform: `scaleX(${recoveryFraction})` }} />
+        </div>}
         {snapshot.combo >= 2 && phase === "playing" && <p className="combo-counter">{snapshot.combo}<span>連続撃破</span></p>}
         {feedback?.kind === "damage" && <div key={feedback.id} className="damage-vignette" aria-hidden="true" />}
     </>;

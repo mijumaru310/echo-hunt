@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="120" viewBox="0 0 600 120" preserveAspectRatio="none">
+  <defs>
+    <path id="face" d="M35 4H565A31 31 0 0 0 596 35V85A31 31 0 0 0 565 116H35A31 31 0 0 0 4 85V35A31 31 0 0 0 35 4Z"/>
+    <clipPath id="wood-clip"><use href="#face"/></clipPath>
+    <linearGradient id="wood" x2="0" y2="1">
+      <stop stop-color="#603d2e"/>
+      <stop offset=".22" stop-color="#513226"/>
+      <stop offset=".6" stop-color="#59372a"/>
+      <stop offset="1" stop-color="#39271f"/>
+    </linearGradient>
+    <linearGradient id="edge" x2="0" y2="1">
+      <stop stop-color="#9a805e"/>
+      <stop offset=".45" stop-color="#6f5740"/>
+      <stop offset="1" stop-color="#877052"/>
+    </linearGradient>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency=".018 .32" numOctaves="2" seed="8" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+  </defs>
+  <use href="#face" fill="#21120e" stroke="#1a100c" stroke-width="4"/>
+  <use href="#face" fill="url(#wood)"/>
+  <g clip-path="url(#wood-clip)" fill="none" stroke-linecap="round">
+    <path d="M0 22C90 11 126 34 224 24S385 13 600 26M0 37C96 29 137 43 237 35S460 28 600 39M0 53C117 45 164 62 274 50S469 43 600 56M0 73C95 65 179 83 286 71S471 65 600 78M0 95C148 83 220 108 349 94S502 88 600 101" stroke="#b56d47" stroke-width="1.1" opacity=".08"/>
+    <path d="M0 28C112 19 185 45 295 29S472 23 600 32M0 46C89 39 184 55 286 44S482 38 600 49M0 63C125 56 192 74 338 60S485 57 600 66M0 88C120 73 188 97 307 86S471 79 600 91M0 108C133 95 227 113 376 104S492 99 600 111" stroke="#1d100e" stroke-width="1.6" opacity=".12"/>
+    <rect width="600" height="120" filter="url(#grain)" opacity=".08" style="mix-blend-mode:soft-light"/>
+  </g>
+  <use href="#face" fill="none" stroke="url(#edge)" stroke-width="1.5"/>
+  <path d="M40.510 10H559.490A37 37 0 0 0 590 40.510V79.490A37 37 0 0 0 559.490 110H40.510A37 37 0 0 0 10 79.490V40.510A37 37 0 0 0 40.510 10Z" fill="none" stroke="#2b1811" stroke-width="3"/>
+  <path d="M42.974 13H557.026A40 40 0 0 0 587 42.974V77.026A40 40 0 0 0 557.026 107H42.974A40 40 0 0 0 13 77.026V42.974A40 40 0 0 0 42.974 13Z" fill="none" stroke="#bd955d" stroke-opacity=".35" stroke-width="1"/>
+</svg>
