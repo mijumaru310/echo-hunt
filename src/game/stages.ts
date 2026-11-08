@@ -6,7 +6,8 @@ import { enemyDefinitions } from "./enemies.ts";
 import { bossRoomStage } from "./stages/bossRoom.ts";
 
 /** 新しいステージは別ファイルで作り、ここに1行登録する。 */
-export const stages: readonly StageDefinition[] = [mansionStage, sealedHallStage, bossRoomStage, ...practiceStages];
+export const campaignStages: readonly StageDefinition[] = [mansionStage, sealedHallStage, bossRoomStage];
+export const stages: readonly StageDefinition[] = [...campaignStages, ...practiceStages];
 
 export function getStage(id: string): StageDefinition {
     return stages.find((stage) => stage.id === id) ?? stages[0];

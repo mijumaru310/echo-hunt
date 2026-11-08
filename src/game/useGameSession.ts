@@ -4,6 +4,7 @@ import { GameAudio } from "../audio/GameAudio.ts";
 import { OrientationController } from "../sensors/OrientationController.ts";
 import { enemyDefinitions } from "./enemies.ts";
 import { loadSettings, saveSettings } from "./storage.ts";
+import { isDebug } from "./config.ts";
 import type { GameSettings } from "./storage.ts";
 import type { GameDifficulty, GameEvent, GameResult, HauntingKind, StageDefinition } from "./types.ts";
 
@@ -14,12 +15,12 @@ export interface Feedback { id: number; kind: "kill" | "damage" | "wave" | "miss
 export interface HauntingNotice { id: number; kind: HauntingKind; until: number }
 
 function sensorMessage(error: unknown): string {
-    if (!window.isSecureContext) return "スマホのセンサーにはHTTPSのURLが必要です。PC操作でも試せます。";
-    if (!("DeviceOrientationEvent" in window)) return "このブラウザは方向センサーに対応していません。PC操作で試せます。";
+    if (!window.isSecureContext) return "スマホのセンサーにはHTTPSのURLが必要です。" + (isDebug ? "PC操作でも試せます。" : "");
+    if (!("DeviceOrientationEvent" in window)) return "このブラウザは方向センサーに対応していません。" + (isDebug ? "PC操作で試せます。" : "");
     if (error instanceof Error && (error.name === "NotAllowedError" || error.message.includes("許可"))) {
         return "センサーの利用が許可されていません。ブラウザの設定を確認し、もう一度接続してください。";
     }
-    return "センサーを開始できませんでした。もう一度接続するか、PC操作を選んでください。";
+    return "センサーを開始できませんでした。" + (isDebug ? "もう一度接続するか、PC操作を選んでください。" : "センサーを再接続してください。");
 }
 
 /** リアルタイム処理はref、表示だけ約30fps。音源位置はセンサーから直接更新。 */
@@ -173,7 +174,7 @@ export function useGameSession(stage: StageDefinition, difficulty: GameDifficult
     }
 
     function usePc(): void {
-        if (phaseRef.current !== "setup" && phaseRef.current !== "paused") return;
+        if (!isDebug || (phaseRef.current !== "setup" && phaseRef.current !== "paused")) return;
         sensorRef.current?.dispose();
         sensorRef.current = null;
         rebaseInput();

@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import type { CSSProperties, ReactElement } from "react";
 import { useGameSession } from "../game/useGameSession.ts";
 import { enemyDefinitions } from "../game/enemies.ts";
 import { isDebug } from "../game/config.ts";
@@ -15,15 +15,34 @@ interface GameScreenProps {
     onTitle: () => void;
 }
 
-function AudioSettings({ settings, onChange }: { settings: GameSettings; onChange: (settings: GameSettings) => void }): ReactElement {
+interface AudioSettingsProps {
+    settings: GameSettings;
+    onChange: (settings: GameSettings) => void;
+}
+
+function VolumeControl({ settings, onChange }: AudioSettingsProps): ReactElement {
+    const rangeStyle: CSSProperties = { "--volume-level": ((settings.volume - 0.05) / 0.95 * 100) + "%" } as CSSProperties;
+    return (
+        <label className="volume-control">音量 <input aria-label="ゲーム音量" type="range" min="0.05" max="1" step="0.05"
+            style={rangeStyle} value={settings.volume}
+            onChange={(event) => onChange({ ...settings, volume: Number(event.currentTarget.value) })} />
+            <span>{Math.round(settings.volume * 100)}%</span>
+        </label>
+    );
+}
+
+function HapticsControl({ settings, onChange }: AudioSettingsProps): ReactElement {
+    return (
+        <label className="haptics-control"><input type="checkbox" checked={settings.haptics}
+            onChange={(event) => onChange({ ...settings, haptics: event.currentTarget.checked })} />振動を使う<span>対応端末のみ</span></label>
+    );
+}
+
+function AudioSettings(props: AudioSettingsProps): ReactElement {
     return (
         <div className="audio-settings">
-            <label className="volume-control">音量 <input aria-label="ゲーム音量" type="range" min="0.05" max="1" step="0.05"
-                value={settings.volume} onChange={(event) => onChange({ ...settings, volume: Number(event.currentTarget.value) })} />
-                <span>{Math.round(settings.volume * 100)}%</span>
-            </label>
-            <label className="haptics-control"><input type="checkbox" checked={settings.haptics}
-                onChange={(event) => onChange({ ...settings, haptics: event.currentTarget.checked })} />振動を使う<span>対応端末のみ</span></label>
+            <VolumeControl {...props} />
+            <HapticsControl {...props} />
         </div>
     );
 }
@@ -35,17 +54,26 @@ export default function GameScreen({ stage, difficulty = "easy", onFinish, onTit
     const bossStage = stage.waves.some((wave) => wave.enemies.some((spawn) => enemyDefinitions[spawn.kind].boss));
     const inputLabels = { idle: "未接続", permission: "許可を確認中", waiting: "スマホを少し動かしてください", sensor: "接続済み", pc: "PC操作", error: "再接続してください" };
     const hasInputPending = game.inputStatus === "permission" || game.inputStatus === "waiting";
+    const currentStep: "audio" | "sensor" | "start" = game.audioStatus !== "ready" ? "audio" : !game.inputReady ? "sensor" : "start";
 
-    const inputControls = (
-        <div className="input-controls">
+    const sensorControls = (
+        <>
             <button className="connection-button" type="button" disabled={hasInputPending || game.inputStatus === "sensor"}
                 onClick={() => { void game.startSensor(); }}>
-                <span>スマホのセンサーを接続</span><small>{inputLabels[game.inputStatus]}</small>
+                <span>スマホのセンサーを接続</span><small role="status">{inputLabels[game.inputStatus]}</small>
             </button>
             {game.sensorError && <p className="inline-error" role="alert">{game.sensorError}</p>}
-            <button className="text-button pc-option" type="button" onClick={game.usePc} disabled={game.inputStatus === "pc"}>
-                {game.inputStatus === "pc" ? "PC操作を選択中" : "PCのスライダーで試す"}
-            </button>
+        </>
+    );
+    const pcControl: ReactElement | null = isDebug ? (
+        <button className="text-button pc-option" type="button" onClick={game.usePc} disabled={game.inputStatus === "pc"}>
+            {game.inputStatus === "pc" ? "PC操作を選択中" : "PCのスライダーで試す"}
+        </button>
+    ) : null;
+    const inputControls = (
+        <div className="input-controls">
+            {sensorControls}
+            {pcControl}
         </div>
     );
 
@@ -56,23 +84,41 @@ export default function GameScreen({ stage, difficulty = "easy", onFinish, onTit
                 <div className="foyer-controls">
                     <h1>プレイ前の確認</h1>
                     <p className="stage-caption">{stage.name} · {difficultyRules[difficulty].label}</p>
-                    <ol className="setup-instructions">
-                        <li>イヤホンをつけ、足音が右から聞こえるか確かめる。</li>
-                        <li>スマホを顔の正面に持ち、体ごと向きを変える。</li>
-                        <li>{difficulty === "easy" ? "ゲージが満ちてピッと鳴ったらタップ。" : "音で方向を判断してタップ。空振り後は約0.65秒、攻撃できません。"}命中音のあと、敵の気配が消える。</li>
-                    </ol>
-                    <p className="stage-tip">{difficulty === "normal" && stage.id === "mansion" ? "ロックの合図はありません。足音を正面に捉え、自分で攻撃を決めてください。鋭い唸り声は攻撃の前触れ。" : stage.hint}</p>
-                    <div className="foyer-checks">
-                        <button className="connection-button" type="button" onClick={() => { void game.prepareAudio(); }} disabled={game.audioStatus === "loading"}>
-                            <span>{game.audioStatus === "ready" ? "右側の足音をもう一度聴く" : "音声を接続して足音を聴く"}</span>
-                            <small>{game.audioStatus === "ready" ? "接続済み" : game.audioStatus === "loading" ? "準備中" : "未接続"}</small>
-                        </button>
-                        {game.audioStatus === "error" && <p className="inline-error" role="alert">音声を再生できませんでした。もう一度接続してください。</p>}
-                        {inputControls}
+                    <div className="setup-flow">
+                        <section className="setup-step setup-audio" data-complete={game.audioStatus === "ready"}
+                            aria-current={currentStep === "audio" ? "step" : undefined}>
+                            <button className="connection-button" type="button" onClick={() => { void game.prepareAudio(); }} disabled={game.audioStatus === "loading"}>
+                                <span>{game.audioStatus === "ready" ? "右側の足音をもう一度聴く" : "音声を接続して足音を聴く"}</span>
+                                <small role="status">{game.audioStatus === "ready" ? "接続済み" : game.audioStatus === "loading" ? "準備中" : "未接続"}</small>
+                            </button>
+                            {game.audioStatus === "error" && <p className="inline-error" role="alert">音声を再生できませんでした。もう一度接続してください。</p>}
+                            <VolumeControl settings={game.settings} onChange={game.changeSettings} />
+                        </section>
+                        <section className="setup-step setup-sensor" data-complete={game.inputReady}
+                            aria-current={currentStep === "sensor" ? "step" : undefined}>
+                            {sensorControls}
+                            {game.inputStatus !== "pc" && <p className="setup-direction">スマホを顔の正面に持ち、体ごと向きを変える。</p>}
+                        </section>
+                        <div className="setup-options">
+                            <HapticsControl settings={game.settings} onChange={game.changeSettings} />
+                            <div className="setup-support">
+                                <details className="setup-help enemy-guide">
+                                    <summary>操作と敵の特徴</summary>
+                                    <ol className="setup-instructions">
+                                        <li>イヤホンをつけ、足音が右から聞こえるか確かめる。</li>
+                                        <li>{difficulty === "easy" ? "ゲージが満ちてピッと鳴ったらタップ。" : "音で方向を判断してタップ。空振り後は約0.65秒、攻撃できません。"}命中音のあと、敵の気配が消える。</li>
+                                    </ol>
+                                    <p className="stage-tip">{difficulty === "normal" && stage.id === "mansion" ? "ロックの合図はありません。足音を正面に捉え、自分で攻撃を決めてください。鋭い唸り声は攻撃の前触れ。" : stage.hint}</p>
+                                    <ul>{Object.entries(enemyDefinitions).map(([id, enemy]) => <li key={id}><strong>{enemy.name}</strong><span>{enemy.description}</span></li>)}</ul>
+                                </details>
+                                {pcControl}
+                            </div>
+                        </div>
+                        <div className="setup-step setup-start" aria-current={currentStep === "start" ? "step" : undefined}>
+                            <button className="menu-primary" type="button" onClick={game.begin}
+                                disabled={game.audioStatus !== "ready" || !game.inputReady}>ゲーム開始</button>
+                        </div>
                     </div>
-                    <AudioSettings settings={game.settings} onChange={game.changeSettings} />
-                    <button className="menu-primary" type="button" onClick={game.begin}
-                        disabled={game.audioStatus !== "ready" || !game.inputReady}>この向きを正面にして開始</button>
                     <p className="setup-footnote">3秒の合図のあとに開始します。ライフ {stage.initialLife} ／ {bossStage ? "ボス1体" : stage.mode === "waves" ? "全" + stage.waves.length + "波" : (stage.durationMs ?? 0) / 1000 + "秒"}</p>
                     {game.message && <p role="status">{game.message}</p>}
                 </div>
@@ -82,14 +128,16 @@ export default function GameScreen({ stage, difficulty = "easy", onFinish, onTit
 
     return (
         <main className="echo-game hunt-screen" data-paused={phase === "paused"} data-feedback={feedback?.kind ?? "none"}
-            data-difficulty={difficulty} data-horror={Boolean(stage.haunting)} data-boss={Boolean(boss)}
+            data-difficulty={difficulty} data-phase={phase} data-horror={Boolean(stage.haunting)} data-boss={Boolean(boss)}
             style={stageBackgroundStyle(stage.background)}
             tabIndex={-1} aria-label="ECHO HUNT 探索中">
-            <div className="mansion-panorama" aria-hidden="true"
-                style={{ backgroundPositionX: "calc(50% - var(--room-width) * " + (game.roomOriginYaw + game.playerYaw) / 360 + ")" }} />
-            <div className="hunt-shade" aria-hidden="true" />
-            {stage.haunting && <div className="horror-mist" aria-hidden="true" />}
-            {game.haunting && phase === "playing" && <div key={game.haunting.id} className="horror-veil" aria-hidden="true"><div className="passing-shadow" /></div>}
+            <div className="hunt-backdrop" aria-hidden="true">
+                <div className="mansion-panorama"
+                    style={{ backgroundPositionX: "calc(50% - var(--room-width) * " + (game.roomOriginYaw + game.playerYaw) / 360 + ")" }} />
+                <div className="hunt-shade" />
+                {stage.haunting && <div className="horror-mist" />}
+                {game.haunting && phase === "playing" && <div key={game.haunting.id} className="horror-veil"><div className="passing-shadow" /></div>}
+            </div>
 
             <header className="game-hud">
                 <div className="hud-stage"><span className="eyebrow">{difficultyRules[difficulty].label} · {bossStage ? "ボス戦" : stage.mode === "waves" ? "第" + (snapshot.waveIndex + 1) + "波 / 全" + snapshot.waveCount + "波" : "練習"}</span><span>{stage.mode === "waves" ? snapshot.waveName : stage.name}</span></div>
@@ -118,11 +166,11 @@ export default function GameScreen({ stage, difficulty = "easy", onFinish, onTit
                     <AudioSettings settings={game.settings} onChange={game.changeSettings} />
                     <button className="menu-primary" type="button" onClick={() => { void game.resume(); }}
                         disabled={game.audioStatus !== "ready" || !game.inputReady}>{game.audioStatus === "loading" ? "音声を準備中" : "探索を再開"}</button>
-                    <div className="pause-secondary"><button className="text-button" type="button" onClick={game.recenter} disabled={!game.inputReady}>今の向きを正面に設定</button><button className="text-button" type="button" onClick={onTitle}>ステージ選択へ</button></div>
+                    <div className="pause-secondary"><button className="text-button" type="button" onClick={onTitle}>ステージ選択へ</button></div>
                 </section>
             )}
 
-            {game.inputStatus === "pc" && phase !== "finished" && phase !== "countdown" && (
+            {isDebug && game.inputStatus === "pc" && phase !== "finished" && phase !== "countdown" && (
                 <section className="pc-controls" aria-label="PCでの方向操作">
                     <label htmlFor="player-yaw">向きを変える <output>{Math.round(game.playerYaw)}°</output></label>
                     <input id="player-yaw" type="range" min="-180" max="180" step="1" value={game.playerYaw} onChange={(event) => game.changeYaw(Number(event.currentTarget.value))} />
