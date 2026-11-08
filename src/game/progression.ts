@@ -2,16 +2,16 @@ import { campaignStages, stages } from "./stages.ts";
 import { getRecord } from "./storage.ts";
 import type { StageDefinition } from "./types.ts";
 
-// Session clears keep progression working when browser storage is unavailable.
+// 保存できないブラウザでも、起動中のクリア履歴から次のステージを解放する。
 export function getUnlockedStageIds(sessionClearedIds: readonly string[] = []): readonly string[] {
     let lastUnlockedIndex: number = 0;
-    for (const [index, stage] of campaignStages.entries()) {
+    for (const [campaignIndex, stage] of campaignStages.entries()) {
         const cleared: boolean = sessionClearedIds.includes(stage.id)
             || getRecord(stage.id, "easy").cleared || getRecord(stage.id, "normal").cleared;
-        if (cleared) lastUnlockedIndex = Math.max(lastUnlockedIndex, index + 1);
+        if (cleared) lastUnlockedIndex = Math.max(lastUnlockedIndex, campaignIndex + 1);
     }
 
-    // Existing later-stage clears also preserve access to earlier stages.
+    // 順番制を導入する前のクリア記録でも、手前のステージをロックし直さない。
     const unlockedCampaignIds: readonly string[] = campaignStages
         .slice(0, lastUnlockedIndex + 1).map((stage: StageDefinition): string => stage.id);
     return stages.filter((stage: StageDefinition): boolean =>
@@ -21,6 +21,6 @@ export function getUnlockedStageIds(sessionClearedIds: readonly string[] = []): 
 }
 
 export function getNextStage(stageId: string): StageDefinition | null {
-    const index: number = campaignStages.findIndex((stage: StageDefinition): boolean => stage.id === stageId);
-    return index < 0 ? null : campaignStages[index + 1] ?? null;
+    const stageIndex: number = campaignStages.findIndex((stage: StageDefinition): boolean => stage.id === stageId);
+    return stageIndex < 0 ? null : campaignStages[stageIndex + 1] ?? null;
 }

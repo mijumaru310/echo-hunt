@@ -7,6 +7,7 @@ const settingsKey = "echo-hunt:settings:v1";
 const recordKey = (id: string, difficulty: GameDifficulty): string =>
     difficulty === "normal" ? `echo-hunt:record:v1:${id}:normal` : `echo-hunt:record:v1:${id}`;
 
+// 保存禁止や壊れたJSONは未保存として扱い、初期値でプレイを続ける。
 function read(key: string): unknown {
     try { return JSON.parse(localStorage.getItem(key) ?? "null"); } catch { return null; }
 }
@@ -15,26 +16,26 @@ function write(key: string, value: unknown): void {
 }
 
 export function loadSettings(): GameSettings {
-    const value = read(settingsKey) as Partial<GameSettings> | null;
+    const savedSettings = read(settingsKey) as Partial<GameSettings> | null;
     return {
-        volume: typeof value?.volume === "number" && Number.isFinite(value.volume) ? Math.max(0.05, Math.min(1, value.volume)) : 0.7,
-        haptics: typeof value?.haptics === "boolean" ? value.haptics : true,
-        music: typeof value?.music === "boolean" ? value.music : true,
+        volume: typeof savedSettings?.volume === "number" && Number.isFinite(savedSettings.volume) ? Math.max(0.05, Math.min(1, savedSettings.volume)) : 0.7,
+        haptics: typeof savedSettings?.haptics === "boolean" ? savedSettings.haptics : true,
+        music: typeof savedSettings?.music === "boolean" ? savedSettings.music : true,
     };
 }
 export function saveSettings(settings: GameSettings): void { write(settingsKey, settings); }
 
 export function getRecord(stageId: string, difficulty: GameDifficulty = "easy"): StageRecord {
-    const value = read(recordKey(stageId, difficulty)) as Partial<StageRecord> | null;
+    const savedRecord = read(recordKey(stageId, difficulty)) as Partial<StageRecord> | null;
     return {
-        score: typeof value?.score === "number" && Number.isFinite(value.score) ? Math.max(0, value.score) : 0,
-        cleared: value?.cleared === true,
+        score: typeof savedRecord?.score === "number" && Number.isFinite(savedRecord.score) ? Math.max(0, savedRecord.score) : 0,
+        cleared: savedRecord?.cleared === true,
     };
 }
 
 export function saveResult(result: GameResult): { bestScore: number; isNewRecord: boolean } {
-    const previous = getRecord(result.stageId, result.difficulty);
-    const score = Math.max(previous.score, result.score);
-    write(recordKey(result.stageId, result.difficulty), { score, cleared: previous.cleared || result.reason === "cleared" });
-    return { bestScore: score, isNewRecord: result.score > previous.score };
+    const previousRecord = getRecord(result.stageId, result.difficulty);
+    const score = Math.max(previousRecord.score, result.score);
+    write(recordKey(result.stageId, result.difficulty), { score, cleared: previousRecord.cleared || result.reason === "cleared" });
+    return { bestScore: score, isNewRecord: result.score > previousRecord.score };
 }

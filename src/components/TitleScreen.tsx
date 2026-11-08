@@ -18,22 +18,22 @@ export default function TitleScreen({ initialStageId, initialDifficulty = "easy"
         unlockedStageIds.includes(initialStageId) ? initialStageId : stages[0].id);
     const [difficulty, setDifficulty] = useState<GameDifficulty>(initialDifficulty);
     const stage = getStage(selectedId);
-    const boss = stage.waves.flatMap((wave) => wave.enemies).map((spawn) => enemyDefinitions[spawn.kind]).find((enemy) => enemy.boss);
-    const record = getRecord(stage.id, difficulty);
-    const practiceStages: readonly StageDefinition[] = stages.filter((item: StageDefinition): boolean =>
-        !campaignStages.some((campaign: StageDefinition): boolean => campaign.id === item.id));
+    const bossDefinition = stage.waves.flatMap((wave) => wave.enemies).map((spawn) => enemyDefinitions[spawn.kind]).find((enemy) => enemy.boss);
+    const stageRecord = getRecord(stage.id, difficulty);
+    const practiceStages: readonly StageDefinition[] = stages.filter((choiceStage: StageDefinition): boolean =>
+        !campaignStages.some((campaign: StageDefinition): boolean => campaign.id === choiceStage.id));
 
-    function stageChoice(item: StageDefinition): ReactElement {
-        const unlocked: boolean = unlockedStageIds.includes(item.id);
-        const cleared: boolean = getRecord(item.id, "easy").cleared || getRecord(item.id, "normal").cleared;
+    function stageChoice(choiceStage: StageDefinition): ReactElement {
+        const unlocked: boolean = unlockedStageIds.includes(choiceStage.id);
+        const cleared: boolean = getRecord(choiceStage.id, "easy").cleared || getRecord(choiceStage.id, "normal").cleared;
         return (
-            <li key={item.id} data-locked={!unlocked} data-selected={selectedId === item.id} data-complete={cleared}>
-                <button type="button" className="stage-choice" data-stage-id={item.id} disabled={!unlocked}
-                    aria-pressed={selectedId === item.id} onClick={() => { if (unlocked) setSelectedId(item.id); }}>
+            <li key={choiceStage.id} data-locked={!unlocked} data-selected={selectedId === choiceStage.id} data-complete={cleared}>
+                <button type="button" className="stage-choice" data-stage-id={choiceStage.id} disabled={!unlocked}
+                    aria-pressed={selectedId === choiceStage.id} onClick={() => { if (unlocked) setSelectedId(choiceStage.id); }}>
                     <span className="stage-mark" aria-hidden="true">{!unlocked ? (
                         <svg viewBox="0 0 20 24"><path d="M5 10V6a5 5 0 0 1 10 0v4M3 10h14v12H3z" /><path d="M10 15v3" /></svg>
                     ) : cleared ? "✓" : null}</span>
-                    <span className="stage-choice-name">{item.name}</span>
+                    <span className="stage-choice-name">{choiceStage.name}</span>
                     {cleared && <small>クリア済み</small>}
                 </button>
             </li>
@@ -48,12 +48,12 @@ export default function TitleScreen({ initialStageId, initialDifficulty = "easy"
                     <fieldset className="stage-selector">
                         <legend>探索する場所</legend>
                         <ol className="stage-route">{campaignStages.map(stageChoice)}</ol>
-                        <details className="practice-selector" open={practiceStages.some((item: StageDefinition): boolean => item.id === selectedId) || undefined}>
+                        <details className="practice-selector" open={practiceStages.some((choiceStage: StageDefinition): boolean => choiceStage.id === selectedId) || undefined}>
                             <summary>練習</summary>
                             <ul className="practice-stages">{practiceStages.map(stageChoice)}</ul>
                         </details>
                     </fieldset>
-                    <article className="stage-card" aria-live="polite"><div className="stage-card-meta"><span>{stage.difficulty}</span><span>{boss?.boss ? boss.boss.health + "回命中で撃破" : stage.mode === "waves" ? "全" + stage.waves.length + "波" : "60秒"}</span></div><p className="stage-best">最高得点 <strong>{record.score.toLocaleString()}</strong>{record.cleared && <span>クリア済み</span>}</p></article>
+                    <article className="stage-card" aria-live="polite"><div className="stage-card-meta"><span>{stage.difficulty}</span><span>{bossDefinition?.boss ? bossDefinition.boss.health + "回命中で撃破" : stage.mode === "waves" ? "全" + stage.waves.length + "波" : "60秒"}</span></div><p className="stage-best">最高得点 <strong>{stageRecord.score.toLocaleString()}</strong>{stageRecord.cleared && <span>クリア済み</span>}</p></article>
                     <fieldset className="difficulty-selector" aria-describedby="difficulty-description"><legend>難易度</legend>
                         {(["easy", "normal"] as const).map((mode) => <label key={mode} className={difficulty === mode ? "difficulty-option is-selected" : "difficulty-option"}>
                             <input type="radio" name="difficulty" value={mode} checked={difficulty === mode} onChange={() => setDifficulty(mode)} />
