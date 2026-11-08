@@ -132,3 +132,16 @@ test("すべての合成SEは有限値で、開始・終了にクリックノイ
     }
     await audio.dispose();
 });
+
+test("ロック合図の自作SEはファイル取得せず、方向を持たない単発音として鳴る", async () => {
+    const audio = new SpatialAudio();
+    await audio.preload([]);
+    audio.playCue("lock-ready", "lock-ready", { spatial: false, volume: 0.4 });
+    const source = FakeContext.instances[0].sources.at(-1)!;
+    assert.equal(source.started, true);
+    assert.equal(source.loop, false);
+    assert.equal(fetchCount, 0);
+    await audio.suspend();
+    assert.equal(source.stopped, true);
+    await audio.dispose();
+});

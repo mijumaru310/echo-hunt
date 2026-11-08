@@ -1,6 +1,6 @@
 import type { GameDifficulty, GameResult } from "./types.ts";
 
-export interface GameSettings { volume: number; haptics: boolean }
+export interface GameSettings { volume: number; haptics: boolean; music: boolean }
 export interface StageRecord { score: number; cleared: boolean }
 const settingsKey = "echo-hunt:settings:v1";
 // EASYは従来のキーを使い、すでに保存された記録をそのまま引き継ぐ。
@@ -19,6 +19,7 @@ export function loadSettings(): GameSettings {
     return {
         volume: typeof value?.volume === "number" && Number.isFinite(value.volume) ? Math.max(0.05, Math.min(1, value.volume)) : 0.7,
         haptics: typeof value?.haptics === "boolean" ? value.haptics : true,
+        music: typeof value?.music === "boolean" ? value.music : true,
     };
 }
 export function saveSettings(settings: GameSettings): void { write(settingsKey, settings); }

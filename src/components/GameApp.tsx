@@ -9,9 +9,15 @@ import GameScreen from "./GameScreen.tsx";
 import ResultScreen from "./ResultScreen.tsx";
 import type { SavedResult } from "./ResultScreen.tsx";
 import "./game.css";
+import { useMenuMusic } from "../audio/useMenuMusic.ts";
 
 export default function GameApp(): ReactElement {
     const [screen, setScreen] = useState<"title" | "game" | "result">("title");
+    const music = useMenuMusic(screen !== "game");
+    const musicControl = <button className="menu-music" type="button" aria-pressed={music.enabled} onClick={music.toggle}
+        aria-label={music.blocked ? "BGMを再生する" : music.enabled ? "BGMをオフにする" : "BGMをオンにする"}>
+        <span aria-hidden="true">♫</span> {music.blocked && music.enabled ? "BGM 再生" : music.enabled ? "BGM オン" : "BGM オフ"}
+    </button>;
     const [stageId, setStageId] = useState("mansion");
     const [difficulty, setDifficulty] = useState<GameDifficulty>("easy");
     const [sessionId, setSessionId] = useState(0);
@@ -32,10 +38,10 @@ export default function GameApp(): ReactElement {
         setStageId(id); setDifficulty(nextDifficulty); setSessionId((value) => value + 1); setScreen("game");
     }
     if (screen === "title") return <TitleScreen initialStageId={stageId} initialDifficulty={difficulty}
-        unlockedStageIds={unlockedStageIds} onStart={startGame} />;
+        unlockedStageIds={unlockedStageIds} onStart={startGame} musicControl={musicControl} />;
     if (screen === "result" && result) {
         const nextStage: StageDefinition | null = result.reason === "cleared" ? getNextStage(result.stageId) : null;
-        return <ResultScreen result={result} onRestart={() => startGame(stageId, difficulty)}
+        return <ResultScreen result={result} musicControl={musicControl} onRestart={() => startGame(stageId, difficulty)}
             onTitle={() => setScreen("title")}
             onNextStage={nextStage && unlockedStageIds.includes(nextStage.id)
                 ? (): void => startGame(nextStage.id, difficulty) : undefined} />;

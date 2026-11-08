@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { campaignStages, stages, getStage } from "../game/stages.ts";
 import { getRecord } from "../game/storage.ts";
 import { getUnlockedStageIds } from "../game/progression.ts";
@@ -9,9 +9,10 @@ import { stageBackgroundStyle } from "./stagePresentation.ts";
 import { difficultyRules } from "../game/difficulty.ts";
 import type { GameDifficulty, StageDefinition } from "../game/types.ts";
 
-export default function TitleScreen({ initialStageId, initialDifficulty = "easy", unlockedStageIds = getUnlockedStageIds(), onStart }: {
+export default function TitleScreen({ initialStageId, initialDifficulty = "easy", unlockedStageIds = getUnlockedStageIds(), onStart, musicControl }: {
     initialStageId: string; initialDifficulty?: GameDifficulty; onStart: (stageId: string, difficulty: GameDifficulty) => void;
     unlockedStageIds?: readonly string[];
+    musicControl?: ReactNode;
 }): ReactElement {
     const [selectedId, setSelectedId] = useState<string>((): string =>
         unlockedStageIds.includes(initialStageId) ? initialStageId : stages[0].id);
@@ -40,6 +41,7 @@ export default function TitleScreen({ initialStageId, initialDifficulty = "easy"
     }
     return (
         <main className="echo-game echo-title mansion-menu" style={stageBackgroundStyle(stage.background)}>
+            {musicControl}
             <div className="title-landing">
                 <header className="title-heading"><h1 className="haunt-wordmark"><span>ECHO</span><span>HUNT</span></h1><p className="title-tagline">イヤホンで遊ぶホラーゲーム</p></header>
                 <div className="menu-controls title-main-controls">
@@ -64,7 +66,7 @@ export default function TitleScreen({ initialStageId, initialDifficulty = "easy"
             <div className="menu-controls title-help">
                 <p className="stage-description" aria-live="polite">{stage.description}</p>
                 <p id="difficulty-description">{difficultyRules[difficulty].description}</p>
-                <p className="screen-note title-instructions">イヤホンを装着し、スマホを持って体を回す。<br />{difficulty === "easy" ? "気配を捉え、合図が鳴ったら画面をタップ。" : "音で方向を判断してタップ。空振り後は約0.65秒、攻撃できません。"}</p>
+                <p className="screen-note title-instructions">イヤホンを装着し、スマホを持って体を回す。<br />{difficulty === "easy" ? "気配を捉え、合図が鳴ったら画面のどこでもタップ。" : "音で方向を判断してタップ。空振り後は約0.65秒、攻撃できません。"}</p>
                 <details className="enemy-guide"><summary>操作と敵の特徴</summary><ul>{Object.entries(enemyDefinitions).map(([id, enemy]) => <li key={id}><strong>{enemy.name}</strong><span>{enemy.description}</span></li>)}</ul><p>鋭い唸り声は攻撃予告。撃破が間に合わないとライフを失います。連続撃破で得点が増えます。</p>
                     <p className="fake-clue">第二夜の残響：同じ強さの3歩を繰り返し、近づかず、呼吸もしない。攻撃しても倒せません。</p>
                 </details>

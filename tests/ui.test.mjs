@@ -68,6 +68,8 @@ test("タイトル・準備・リザルトが描画でき、通常画面に敵�
         easy.start(); easy.update(1300, 0);
         assert.match(overlay(easy.snapshot()), /reticle-progress/);
         assert.match(overlay(easy.snapshot()), /is-locked/);
+        assert.match(overlay(easy.snapshot()), /画面のどこでもタップ/);
+        assert.doesNotMatch(overlay(easy.snapshot()), /disabled/);
         for (const reason of ["cleared", "defeated", "time"]) {
             const result = renderToStaticMarkup(React.createElement(Result, {
                 result: { stageId: "mansion", difficulty: "normal", shots: 10, misses: 1, stageName: "第一夜・洋館", reason, score: 1000, bestScore: 1000, isNewRecord: true,

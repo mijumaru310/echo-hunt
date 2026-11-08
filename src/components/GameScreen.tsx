@@ -7,6 +7,7 @@ import type { GameDifficulty, GameResult, StageDefinition } from "../game/types.
 import type { GameSettings } from "../game/storage.ts";
 import { difficultyRules } from "../game/difficulty.ts";
 import CombatOverlay from "./CombatOverlay.tsx";
+import { isAttackTarget } from "../game/attackInput.ts";
 
 interface GameScreenProps {
     stage: StageDefinition;
@@ -106,7 +107,7 @@ export default function GameScreen({ stage, difficulty = "easy", onFinish, onTit
                                     <summary>操作と敵の特徴</summary>
                                     <ol className="setup-instructions">
                                         <li>イヤホンをつけ、足音が右から聞こえるか確かめる。</li>
-                                        <li>{difficulty === "easy" ? "ゲージが満ちてピッと鳴ったらタップ。" : "音で方向を判断してタップ。空振り後は約0.65秒、攻撃できません。"}命中音のあと、敵の気配が消える。</li>
+                                        <li>{difficulty === "easy" ? "ゲージが満ちて合図が鳴ったら、画面のどこでもタップ。" : "音で方向を判断して画面をタップ。空振り後は約0.65秒、攻撃できません。"}一時停止などのボタンは攻撃になりません。命中音のあと、敵の気配が消える。</li>
                                     </ol>
                                     <p className="stage-tip">{difficulty === "normal" && stage.id === "mansion" ? "ロックの合図はありません。足音を正面に捉え、自分で攻撃を決めてください。鋭い唸り声は攻撃の前触れ。" : stage.hint}</p>
                                     <ul>{Object.entries(enemyDefinitions).map(([id, enemy]) => <li key={id}><strong>{enemy.name}</strong><span>{enemy.description}</span></li>)}</ul>
@@ -130,7 +131,13 @@ export default function GameScreen({ stage, difficulty = "easy", onFinish, onTit
         <main className="echo-game hunt-screen" data-paused={phase === "paused"} data-feedback={feedback?.kind ?? "none"}
             data-difficulty={difficulty} data-phase={phase} data-horror={Boolean(stage.haunting)} data-boss={Boolean(boss)}
             style={stageBackgroundStyle(stage.background)}
-            tabIndex={-1} aria-label="ECHO HUNT 探索中">
+            tabIndex={-1} aria-label="ECHO HUNT 探索中"
+            onClick={(event) => {
+                // Include the room's padding and HUD text. The attack button
+                // handles its own click, including keyboard activation.
+                if (phase === "playing" && event.target instanceof Element
+                    && !event.target.closest(".attack-surface") && isAttackTarget(event.target)) game.attack();
+            }}>
             <div className="hunt-backdrop" aria-hidden="true">
                 <div className="mansion-panorama"
                     style={{ backgroundPositionX: "calc(50% - var(--room-width) * " + (game.roomOriginYaw + game.playerYaw) / 360 + ")" }} />
