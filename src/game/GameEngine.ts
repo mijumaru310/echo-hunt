@@ -63,13 +63,13 @@ export class GameEngine {
     update(dtMs: number, playerYaw: number): void {
         if (this.status !== "playing" || !Number.isFinite(dtMs) || dtMs <= 0 || !Number.isFinite(playerYaw)) return;
         // 小刻みに進め、低fps時も予告・攻撃・無敵時間の順序を保つ。
-        let remaining = dtMs;
-        while (remaining > 0 && this.status === "playing") {
-            const timeLeft = this.stage.mode === "timed" ? (this.stage.durationMs ?? 0) - this.elapsedMs : Infinity;
-            if (timeLeft <= 0) { this.finish("time"); break; }
-            const stepMs = Math.min(remaining, 25, timeLeft);
+        let remainingMs = dtMs;
+        while (remainingMs > 0 && this.status === "playing") {
+            const timeLeftMs = this.stage.mode === "timed" ? (this.stage.durationMs ?? 0) - this.elapsedMs : Infinity;
+            if (timeLeftMs <= 0) { this.finish("time"); break; }
+            const stepMs = Math.min(remainingMs, 25, timeLeftMs);
             this.step(stepMs, playerYaw);
-            remaining -= stepMs;
+            remainingMs -= stepMs;
             if (this.status === "playing" && this.stage.mode === "timed" && this.elapsedMs >= (this.stage.durationMs ?? 0)) this.finish("time");
         }
     }
@@ -205,19 +205,19 @@ export class GameEngine {
             this.targetId = null;
             return;
         }
-        const active = this.enemies.filter(isEnemyVulnerable);
-        const current = active.find((enemy) => enemy.id === this.targetId);
-        let target = current && isInCaptureRange(relativeAngle(current.worldYaw, playerYaw)) ? current : undefined;
-        if (!target) {
-            target = active.filter((enemy) => isInCaptureRange(relativeAngle(enemy.worldYaw, playerYaw)))
+        const vulnerableEnemies = this.enemies.filter(isEnemyVulnerable);
+        const currentTarget = vulnerableEnemies.find((enemy) => enemy.id === this.targetId);
+        let lockTarget = currentTarget && isInCaptureRange(relativeAngle(currentTarget.worldYaw, playerYaw)) ? currentTarget : undefined;
+        if (!lockTarget) {
+            lockTarget = vulnerableEnemies.filter((enemy) => isInCaptureRange(relativeAngle(enemy.worldYaw, playerYaw)))
                 .sort((a, b) => Math.abs(relativeAngle(a.worldYaw, playerYaw)) - Math.abs(relativeAngle(b.worldYaw, playerYaw)) || a.distance - b.distance)[0];
         }
-        this.targetId = target?.id ?? null;
-        for (const enemy of active) {
+        this.targetId = lockTarget?.id ?? null;
+        for (const enemy of vulnerableEnemies) {
             const wasReady = enemy.capture.progressMs >= enemy.lockTimeMs;
             enemy.capture.progressMs = Math.max(0, Math.min(enemy.lockTimeMs,
-                enemy.capture.progressMs + (enemy === target ? dtMs : -dtMs * enemy.lockTimeMs / decayTimeMs)));
-            if (enemy === target && !wasReady && enemy.capture.progressMs >= enemy.lockTimeMs) {
+                enemy.capture.progressMs + (enemy === lockTarget ? dtMs : -dtMs * enemy.lockTimeMs / decayTimeMs)));
+            if (enemy === lockTarget && !wasReady && enemy.capture.progressMs >= enemy.lockTimeMs) {
                 this.events.push({ type: "lock-ready", enemyId: enemy.id });
             }
         }
@@ -225,19 +225,19 @@ export class GameEngine {
 
     attack(playerYaw: number): boolean {
         if (this.status !== "playing" || this.isEnding() || !Number.isFinite(playerYaw) || this.attackRecoveryMs > 0) return false;
-        const rules = difficultyRules[this.difficulty];
-        const enemy = rules.requiresLock
-            ? this.enemies.find((item) => item.id === this.targetId && this.isActive(item))
-            : this.enemies.filter((item) => this.isActive(item) && isInCaptureRange(relativeAngle(item.worldYaw, playerYaw)))
+        const attackRules = difficultyRules[this.difficulty];
+        const enemy = attackRules.requiresLock
+            ? this.enemies.find((candidateEnemy) => candidateEnemy.id === this.targetId && this.isActive(candidateEnemy))
+            : this.enemies.filter((candidateEnemy) => this.isActive(candidateEnemy) && isInCaptureRange(relativeAngle(candidateEnemy.worldYaw, playerYaw)))
                 .sort((a, b) => Math.abs(relativeAngle(a.worldYaw, playerYaw)) - Math.abs(relativeAngle(b.worldYaw, playerYaw)) || a.distance - b.distance)[0];
         const hit = enemy && isInCaptureRange(relativeAngle(enemy.worldYaw, playerYaw))
-            && (!rules.requiresLock || enemy.capture.progressMs >= enemy.lockTimeMs);
+            && (!attackRules.requiresLock || enemy.capture.progressMs >= enemy.lockTimeMs);
         if (!hit) {
-            if (rules.requiresLock) return false;
+            if (attackRules.requiresLock) return false;
             this.shots++;
             this.misses++;
             this.combo = 0;
-            this.attackRecoveryMs = rules.missRecoveryMs;
+            this.attackRecoveryMs = attackRules.missRecoveryMs;
             this.events.push({ type: "attack-missed" });
             return false;
         }
@@ -245,12 +245,12 @@ export class GameEngine {
             this.shots++;
             this.misses++;
             this.combo = 0;
-            this.attackRecoveryMs = rules.missRecoveryMs;
+            this.attackRecoveryMs = attackRules.missRecoveryMs;
             this.events.push({ type: "attack-blocked", enemy: this.copyEnemy(enemy) });
             return false;
         }
         this.shots++;
-        this.attackRecoveryMs = rules.hitRecoveryMs;
+        this.attackRecoveryMs = attackRules.hitRecoveryMs;
         enemy.health--;
         if (enemy.health > 0) {
             recoverBoss(enemy);

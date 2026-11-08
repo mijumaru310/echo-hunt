@@ -42,7 +42,6 @@ export function createRandomEnemy(
     return createEnemy(randomWorldYaw, distance, id, angularVelocity);
 }
 
-// モードに応じて敵を1体生成する。既存の静止モードはそのまま残す。
 export function createEnemyForMode(mode: EnemyMode, id: string): Enemy {
     const angularVelocity: number = mode === "moving"
         ? (Math.random() < 0.5 ? -12 : 12)
@@ -56,8 +55,8 @@ export function updateEnemyPosition(enemy: Enemy, dtMs: number, mode?: EnemyMode
     const elapsedMs: number = Number.isFinite(dtMs) ? Math.max(0, dtMs) : 0;
 
     if (mode === "approaching" && elapsedMs > 0) {
-        const travel: number = (spawnDistance - contactDistance) * elapsedMs / approachTimeMs;
-        return { ...enemy, distance: Math.max(contactDistance, enemy.distance - travel) };
+        const travelDistance: number = (spawnDistance - contactDistance) * elapsedMs / approachTimeMs;
+        return { ...enemy, distance: Math.max(contactDistance, enemy.distance - travelDistance) };
     }
 
     if (elapsedMs === 0 || enemy.angularVelocity === 0) {
